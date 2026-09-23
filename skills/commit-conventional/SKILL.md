@@ -5,7 +5,7 @@ license: MIT
 compatibility: Git instalado; repositório Git válido com mudanças a commitar
 metadata:
   author: Alexandre Junqueira
-  version: "2.0.0"
+  version: "2.1.0"
 ---
 
 # commit-conventional
@@ -24,7 +24,8 @@ git diff --stat HEAD            # tamanho e distribuição da mudança (sem HEAD
 
 Depois leia o conteúdo:
 
-- `git diff HEAD -- <arquivos>` para arquivos rastreados. Não leia lockfiles (`*.lock`, `package-lock.json`), build (`dist/`, `build/`), arquivos minificados ou gerados, a menos que sejam a mudança inteira.
+- **Se já há algo staged**, o commit leva só o que está staged: leia `git diff --cached`. `git diff HEAD` mistura staged e unstaged e faz a mensagem descrever trechos que não vão entrar no commit. Um arquivo que aparece como `MM` no `git status --short` tem **stage parcial**: parte das mudanças dele fica de fora.
+- Sem nada staged, use `git diff HEAD -- <arquivos>` para arquivos rastreados. Não leia lockfiles (`*.lock`, `package-lock.json`), build (`dist/`, `build/`), arquivos minificados ou gerados, a menos que sejam a mudança inteira.
 - Arquivos **untracked** não aparecem no `git diff`. Leia-os diretamente (os listados em `git status` ou `git ls-files --others --exclude-standard`).
 - Em diff grande, comece pelo `--stat` e leia os arquivos mais relevantes, não tudo.
 
@@ -41,11 +42,11 @@ Procure também configuração de convenção: `commitlint.config.*`, `.commitli
 A convenção do repositório vence os padrões desta skill. Em ordem de prioridade:
 
 1. **Config de commitlint/commitizen**: respeite `type-enum`, `scope-enum`, `subject-case`, `header-max-length` e similares.
-2. **Histórico** (`git log`), quando a maioria dos commits já segue Conventional Commits:
-   - **Idioma**: escreva no idioma predominante. Se o histórico é em inglês, a mensagem é em inglês.
+2. **Idioma do histórico**, siga ou não o Conventional Commits: escreva no idioma predominante dos commits. Histórico em inglês (`Add login page`, `Fix typo`) gera mensagem em inglês, mesmo fora do padrão.
+3. **Formato do histórico**, quando a maioria dos commits já segue Conventional Commits:
    - **Escopos**: reutilize os escopos existentes em vez de inventar nomes novos. Se o histórico não usa escopo, não use.
    - **Referências**: copie o formato de ticket usado (`Refs: #123`, `Closes #123`, `ABC-123`).
-3. **Sem convenção detectável** (repositório novo ou histórico fora do padrão): use os padrões abaixo, com mensagem em **português (PT-BR)**.
+4. **Sem convenção detectável** (repositório sem commits, ou histórico sem idioma predominante): use os padrões abaixo, com mensagem em **português (PT-BR)**.
 
 ## 4. Analisar a mudança
 
@@ -66,6 +67,14 @@ Nunca use `git add -A`, `git add .` ou `git commit -a`. Adicione **por nome**: `
 | Staged **e** outras mudanças (unstaged ou untracked) | Pergunte a estratégia: só o staged, incluir tudo, ou dividir. Não altere o stage antes da resposta |
 
 **Arquivos sensíveis ou indevidos** nunca entram por iniciativa da skill: `.env*` (exceto `.env.example`), `*.pem`, `*.key`, `*.p12`, `id_rsa*`, arquivos de credenciais, arquivos com cara de segredo (tokens, chaves de API), binários grandes e artefatos de build fora do `.gitignore`. Deixe-os fora do stage, avise o usuário e sugira adicioná-los ao `.gitignore`. Se o próprio usuário já os colocou no stage, avise e peça confirmação antes de commitar.
+
+**Segredos dentro do código**: o nome do arquivo não basta. Depois do stage e antes do commit, procure no diff staged:
+
+```bash
+git diff --cached -U0 | grep -nE '^\+.*(sk_live_[0-9A-Za-z]{10,}|AKIA[0-9A-Z]{16}|gh[pousr]_[0-9A-Za-z]{30,}|xox[baprs]-[0-9A-Za-z-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)'
+```
+
+Também desconfie de valor literal longo atribuído a nomes como `api_key`, `secret`, `token` ou `password`. Se aparecer algo, **não commite**: mostre o arquivo e a linha (sem repetir o valor inteiro), sugira mover o valor para variável de ambiente e espere a decisão do usuário. Chaves de teste óbvias (`sk_test_`, valores `FAKE`/`example`) merecem um aviso, mas não bloqueiam.
 
 ## 6. Atomicidade
 
@@ -155,7 +164,7 @@ EOF
 
 - Nunca use `--no-verify`, `--amend` ou `--allow-empty` sem pedido explícito.
 - **Hook de pre-commit falhou**: mostre o erro, explique a causa e proponha a correção. Não corrija o código do usuário nem tente de novo sem confirmação.
-- **Hook reformatou arquivos** (formatter automático): faça stage de novo **só dos mesmos arquivos** e repita o commit uma vez.
+- **Hook reformatou arquivos** (formatter automático): faça stage de novo **só dos mesmos arquivos** e repita o commit uma vez. **Exceção**: se algum desses arquivos tinha stage parcial (`MM`), `git add` levaria também as mudanças que o usuário deixou de fora. Nesse caso não refaça o stage: avise quais arquivos o hook alterou e deixe o usuário decidir.
 - Depois do commit, mostre `git log --oneline -1` e o `git status` resumido, deixando claro o que ficou fora do commit.
 
 ## Referências

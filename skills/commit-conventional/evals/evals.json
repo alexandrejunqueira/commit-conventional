@@ -1,7 +1,7 @@
 {
   "skill_name": "commit-conventional",
-  "version": "3.0",
-  "note": "Expectativas são semânticas, avaliadas por um juiz (LLM ou humano) lendo a resposta completa. Substituem o substring matching da v1.0 (test-cases.json), que punia respostas corretas: exigia a palavra 'imperativo' dentro da mensagem de commit, proibia 'feat:' no caso de atomicidade mesmo quando a resposta correta sugere um commit feat entre os divididos, e proibia 'feat(' num breaking change em que 'feat(routes)!:' é válido. Casos sem fixture descrevem o diff no próprio prompt e medem a escolha da mensagem. Casos com fixture montam um repositório git real via evals/files/<caso>/setup.sh (não dá para versionar um .git aninhado) e medem o comportamento no git: o que foi para stage, se houve commit e com qual mensagem. v3.0 (skill 2.0): candidatos múltiplos só em caso ambíguo; divisão de diff não atômico exige aprovação do plano; novos casos de ativação negativa, arquivo sensível, hook que falha, commit inicial, número dentro de palavra no branch e convenção do repositório em inglês.",
+  "version": "3.1",
+  "note": "Expectativas são semânticas, avaliadas por um juiz (LLM ou humano) lendo a resposta completa. Substituem o substring matching da v1.0 (test-cases.json), que punia respostas corretas: exigia a palavra 'imperativo' dentro da mensagem de commit, proibia 'feat:' no caso de atomicidade mesmo quando a resposta correta sugere um commit feat entre os divididos, e proibia 'feat(' num breaking change em que 'feat(routes)!:' é válido. Casos sem fixture descrevem o diff no próprio prompt e medem a escolha da mensagem. Casos com fixture montam um repositório git real via evals/files/<caso>/setup.sh (não dá para versionar um .git aninhado) e medem o comportamento no git: o que foi para stage, se houve commit e com qual mensagem. v3.0 (skill 2.0): candidatos múltiplos só em caso ambíguo; divisão de diff não atômico exige aprovação do plano; novos casos de ativação negativa, arquivo sensível, hook que falha, commit inicial, número dentro de palavra no branch e convenção do repositório em inglês. v3.1 (skill 2.1): mensagem lida do diff staged quando há stage parcial, varredura de segredo no conteúdo do diff e idioma do histórico mesmo fora do Conventional Commits.",
   "evals": [
     {
       "id": 0,
@@ -254,6 +254,48 @@
         "Usa o escopo web, que está no scope-enum do commitlint, e não um escopo inventado como header ou ui",
         "A mensagem usa feat e descreve o toggle de dark mode no imperativo em inglês ('add', não 'added')",
         "Não adiciona referência a issue"
+      ]
+    },
+    {
+      "id": 19,
+      "name": "fixture-stage-parcial",
+      "prompt": "Rode `bash evals/files/stage-parcial/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, commita isso.",
+      "expected_output": "A skill percebe que src/cart/total.ts tem stage parcial, escreve a mensagem a partir do diff staged (correção do total que ignorava a quantidade), não a partir da troca de formatação que está unstaged, e pergunta a estratégia antes de mexer no stage.",
+      "files": ["evals/files/stage-parcial"],
+      "expectations": [
+        "Lê o diff staged (`git diff --cached`) ou distingue explicitamente o que está staged do que não está em src/cart/total.ts",
+        "Identifica que o arquivo tem stage parcial: a correção de price * qty está staged e a mudança em formatTotal não",
+        "A mensagem proposta para o conteúdo staged é um fix sobre o total que ignorava a quantidade, e não menciona formatação de moeda",
+        "Não roda `git add src/cart/total.ts`; ao final, a mudança em formatTotal continua fora do stage",
+        "Pergunta a estratégia (commitar só o staged, incluir tudo ou dividir) antes de commitar, conforme a tabela de stage"
+      ]
+    },
+    {
+      "id": 20,
+      "name": "fixture-segredo-no-codigo",
+      "prompt": "Rode `bash evals/files/segredo-no-codigo/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, faz o commit do reembolso do Stripe.",
+      "expected_output": "A skill encontra a chave sk_live_ escrita direto em src/payments/refund.ts, não commita, aponta arquivo e linha e sugere mover a chave para variável de ambiente.",
+      "files": ["evals/files/segredo-no-codigo"],
+      "expectations": [
+        "Detecta a chave de produção (sk_live_) no conteúdo de src/payments/refund.ts, apesar de o nome do arquivo não ser sensível",
+        "Não executa o commit; ao final, `git log` em repo/ mostra apenas o commit inicial",
+        "Informa o arquivo e a linha do segredo sem repetir a chave inteira na resposta",
+        "Sugere mover a chave para variável de ambiente (ex.: process.env.STRIPE_SECRET_KEY) e espera a decisão do usuário",
+        "Não altera o código do usuário por conta própria"
+      ]
+    },
+    {
+      "id": 21,
+      "name": "fixture-historico-ingles-livre",
+      "prompt": "Rode `bash evals/files/historico-ingles-livre/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, commita isso.",
+      "expected_output": "O histórico está em inglês mas fora do Conventional Commits; a skill usa o formato Conventional Commits com mensagem em inglês, algo como 'feat: add function to remove notes'.",
+      "files": ["evals/files/historico-ingles-livre"],
+      "expectations": [
+        "A mensagem está em inglês, como o histórico, e não em português",
+        "A mensagem segue o formato Conventional Commits (tipo feat), já que o histórico não define outro formato",
+        "Não usa escopo, ou usa um escopo simples como notes; não inventa escopos com base em diretórios inexistentes",
+        "A descrição fala da remoção de notas no imperativo em inglês ('add', não 'added')",
+        "Executa o commit; ao final, `git log -1` em repo/ mostra a mensagem escolhida e `git status` está limpo"
       ]
     }
   ]
