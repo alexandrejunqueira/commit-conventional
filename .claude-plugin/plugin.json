@@ -1,0 +1,10 @@
+{
+  "name": "commit-conventional",
+  "version": "1.0.0",
+  "description": "Commits com mensagens Conventional Commits em português: analisa o diff, gera 3 candidatos, detecta diffs não atômicos e executa o commit.",
+  "author": {
+    "name": "Alexandre Junqueira"
+  },
+  "license": "MIT",
+  "keywords": ["git", "commit", "conventional-commits", "changelog", "skill"]
+}

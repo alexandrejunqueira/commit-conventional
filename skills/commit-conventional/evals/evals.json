@@ -1,0 +1,180 @@
+{
+  "skill_name": "commit-conventional",
+  "version": "2.0",
+  "note": "Expectativas são semânticas, avaliadas por um juiz (LLM ou humano) lendo a resposta completa. Substituem o substring matching da v1.0 (test-cases.json), que punia respostas corretas: exigia a palavra 'imperativo' dentro da mensagem de commit, proibia 'feat:' no caso de atomicidade mesmo quando a resposta correta sugere um commit feat entre os divididos, e proibia 'feat(' num breaking change em que 'feat(routes)!:' é válido. Casos sem fixture descrevem o diff no próprio prompt e medem a escolha da mensagem. Casos com fixture (10, 11, 12) montam um repositório git real via evals/files/<caso>/setup.sh (não dá para versionar um .git aninhado) e medem o comportamento no git: o que foi para stage, se houve commit e com qual mensagem.",
+  "evals": [
+    {
+      "id": 0,
+      "name": "feat-escopo-claro",
+      "prompt": "Faz o commit da autenticação com OAuth2 do Google. Estou no branch feat/oauth-google e o diff adiciona src/auth/oauth.ts com o fluxo OAuth2 (redirect, callback e troca de token) e src/auth/oauth.test.ts com os testes.",
+      "expected_output": "Mensagem feat(auth) no imperativo descrevendo o login OAuth2 com Google.",
+      "files": [],
+      "expectations": [
+        "A mensagem escolhida usa o tipo feat",
+        "Usa o escopo auth, já que todos os arquivos estão em src/auth",
+        "A descrição menciona OAuth2 ou login com Google",
+        "A descrição está no modo imperativo em português (ex.: 'adiciona', 'implementa'), não no particípio ('adicionado')",
+        "Apresenta 3 candidatos (literal, impacto, intenção) e justifica a escolha em 1-2 linhas",
+        "Não usa mensagem genérica como 'update files' ou 'adiciona arquivos'"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "fix-com-issue",
+      "prompt": "Preciso commitar esta correção do bug de validação de email, é a issue #89. Branch fix/email-validation; o diff altera a regex em src/utils/validation.ts para seguir a RFC 5322, porque emails com '+' eram rejeitados.",
+      "expected_output": "Mensagem fix descrevendo a correção da validação de email, com footer Refs: #89.",
+      "files": [],
+      "expectations": [
+        "A mensagem escolhida usa o tipo fix",
+        "A descrição menciona validação de email",
+        "Inclui o footer 'Refs: #89'",
+        "Se houver corpo, ele explica o porquê (emails com '+' rejeitados) e não o como (detalhes da regex)",
+        "A primeira linha tem até 72 caracteres"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "refactor-estrutural",
+      "prompt": "Commita a refatoração do módulo de validação. Branch refactor/extract-validators; o diff move 400 linhas de schemas de src/utils/common.ts para src/validation/schemas.ts e atualiza 12 imports. Nenhum comportamento mudou.",
+      "expected_output": "Mensagem refactor descrevendo a extração dos schemas para módulo próprio.",
+      "files": [],
+      "expectations": [
+        "A mensagem escolhida usa o tipo refactor",
+        "Não classifica como feat nem fix, já que não há mudança de comportamento",
+        "A descrição comunica que os schemas de validação foram extraídos ou movidos para um módulo/arquivo próprio (qualquer verbo equivalente vale: 'extrai', 'move', 'separa')",
+        "Não trata os 12 imports atualizados como mudança separada que exige outro commit"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "docs",
+      "prompt": "Faz o commit disso. Branch docs/auth-guide; o diff só adiciona uma seção sobre OAuth2 no README.md e atualiza o sumário.",
+      "expected_output": "Mensagem docs descrevendo o guia de autenticação OAuth2.",
+      "files": [],
+      "expectations": [
+        "A mensagem escolhida usa o tipo docs",
+        "A descrição menciona autenticação ou OAuth2",
+        "Não classifica como feat, apesar de o assunto documentado ser uma feature"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "test-cobertura",
+      "prompt": "Commita os testes novos. Branch test/auth-coverage; o diff cria src/auth/auth.test.ts com 15 testes e a cobertura do módulo auth subiu de 40% para 85%.",
+      "expected_output": "Mensagem test(auth) descrevendo o aumento de cobertura.",
+      "files": [],
+      "expectations": [
+        "A mensagem escolhida usa o tipo test",
+        "Usa o escopo auth ou menciona auth na descrição",
+        "A descrição ou o corpo menciona o aumento de cobertura (idealmente com os números 40% e 85%)",
+        "Não classifica como feat nem fix"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "chore-dependencia",
+      "prompt": "Faz o commit da atualização do Next. Branch chore/update-nextjs; o package.json vai de next@14.0.0 para next@14.1.0 e 3 componentes foram ajustados por causa de uma API depreciada.",
+      "expected_output": "Mensagem chore(deps) ou equivalente mencionando Next.js 14.1.",
+      "files": [],
+      "expectations": [
+        "A mensagem escolhida usa o tipo chore (build ou fix também são aceitáveis se justificados; feat não é)",
+        "A descrição menciona Next.js e a versão 14.1",
+        "O corpo ou a justificativa menciona o ajuste nos 3 componentes, ou a resposta avalia explicitamente se eles pertencem ao mesmo commit"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "commit-inicial",
+      "prompt": "Primeiro commit do projeto, faz aí. Branch main, repositório sem commits; os arquivos são package.json, tsconfig.json, .env.example e README.md.",
+      "expected_output": "Mensagem feat descrevendo a inicialização do projeto.",
+      "files": [],
+      "expectations": [
+        "A mensagem escolhida usa o tipo feat, conforme a regra de commit inicial da skill",
+        "A descrição comunica a inicialização do projeto (ex.: 'inicializa projeto com setup base')",
+        "Não usa chore nem refactor"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "perf-com-numeros",
+      "prompt": "Commita a otimização. Branch perf/db-indexing; o diff adiciona uma migration que cria INDEX em users(created_at). A query de listagem caiu de 2.3s para 80ms.",
+      "expected_output": "Mensagem perf descrevendo o índice, com o ganho medido no corpo ou na descrição.",
+      "files": [],
+      "expectations": [
+        "A mensagem escolhida usa o tipo perf",
+        "A descrição menciona o índice em users(created_at) ou a query de listagem",
+        "O ganho medido (2.3s para 80ms) aparece na descrição ou no corpo",
+        "Não classifica como fix nem feat"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "contexto-vago",
+      "prompt": "commita tudo aí. Branch develop, mexi em vários arquivos, nem lembro direito o quê.",
+      "expected_output": "A skill olha o diff real antes de propor mensagem; se o diff não existir ou não for suficiente para inferir o propósito, pede esclarecimento em vez de gerar mensagem genérica.",
+      "files": [],
+      "expectations": [
+        "Tenta inspecionar o repositório (git status/diff) antes de propor mensagem, ou diz que precisa ver o diff",
+        "Não gera nem executa um commit com mensagem genérica como 'update files', 'various changes' ou 'ajustes'",
+        "Se não conseguir inferir o propósito, pergunta ao usuário qual o objetivo das mudanças ou qual o módulo principal"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "body-workaround",
+      "prompt": "Commita o fix do CSP. Branch fix/csp-nonce-nextjs; em middleware.ts adicionei um nonce manual no header Content-Security-Policy. É workaround para o bug vercel/next.js#58843, em que o nonce gerado automaticamente não é passado para scripts inline.",
+      "expected_output": "Mensagem fix com corpo explicando que é workaround e referenciando o bug upstream.",
+      "files": [],
+      "expectations": [
+        "A mensagem escolhida usa o tipo fix",
+        "A descrição menciona CSP ou nonce",
+        "Inclui um corpo explicando que é um workaround e o porquê (nonce automático não chega aos scripts inline)",
+        "Referencia o bug upstream vercel/next.js#58843 no corpo ou no footer",
+        "Não usa 'Refs: #58843' como se fosse issue do próprio repositório"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "fixture-atomicidade",
+      "prompt": "Rode `bash evals/files/atomicidade/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, faz o commit das minhas mudanças.",
+      "expected_output": "A skill lê o diff real, detecta três mudanças não relacionadas (refactor em auth, endpoint novo em api, etapa de testes no CI), para e recomenda dividir em 3 commits atômicos antes de commitar.",
+      "files": ["evals/files/atomicidade"],
+      "expectations": [
+        "Inspeciona o diff real do repositório antes de propor qualquer mensagem",
+        "Identifica as três mudanças: refactor em src/auth/oauth.ts, novo endpoint getUserById em src/api/users.ts e nova etapa de testes em .github/workflows/deploy.yml",
+        "Recomenda dividir em commits atômicos (3 commits) em vez de um commit único",
+        "Sugere uma mensagem adequada para cada commit (ex.: refactor(auth), feat(api), ci); mencionar feat para o endpoint é correto",
+        "Não executa um commit único com as três mudanças; ao final, `git log` em repo/ mostra apenas o commit inicial, ou mostra 3 commits separados se o agente dividir por conta própria, nunca 1 commit misturado"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "fixture-staging-misto",
+      "prompt": "Rode `bash evals/files/staging-misto/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, commita isso aí.",
+      "expected_output": "A skill detecta arquivos staged (ProfilePage.tsx, useProfile.ts) e unstaged/untracked (ProfilePage.test.tsx, README.md), não altera o stage por conta própria e pergunta qual estratégia usar.",
+      "files": ["evals/files/staging-misto"],
+      "expectations": [
+        "Detecta que há mudanças staged (src/profile/ProfilePage.tsx e src/profile/useProfile.ts) e não staged (src/profile/ProfilePage.test.tsx, untracked, e README.md, modificado)",
+        "Pergunta ao usuário qual estratégia usar (commitar só o staged, incluir tudo, ou dividir) em vez de decidir sozinho",
+        "Não executa o commit antes da resposta do usuário; ao final, `git log` em repo/ mostra apenas o commit inicial",
+        "Não altera o stage por conta própria: ProfilePage.test.tsx e README.md continuam fora do stage",
+        "Se sugerir mensagens, a do código staged é feat(profile) ou equivalente"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "fixture-breaking-change",
+      "prompt": "Rode `bash evals/files/breaking-change/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, faz o commit.",
+      "expected_output": "A skill lê o diff, reconhece a renomeação do endpoint público /users para /accounts como breaking change, faz stage de todos os arquivos relacionados e commita com '!' no tipo e footer BREAKING CHANGE.",
+      "files": ["evals/files/breaking-change"],
+      "expectations": [
+        "Reconhece que renomear o endpoint público /users para /accounts é uma breaking change",
+        "A mensagem usa '!' após o tipo ou escopo (ex.: 'feat!:' ou 'feat(routes)!:'; ambos são válidos)",
+        "A mensagem tem o footer 'BREAKING CHANGE:' descrevendo o impacto (clientes que chamam /users quebram)",
+        "Faz stage de todos os arquivos da mudança, incluindo o novo src/routes/accounts.ts (untracked) e a remoção de src/routes/users.ts",
+        "Executa o commit; ao final, `git log -1` em repo/ mostra a mensagem escolhida e `git status` está limpo",
+        "O commit não contém footer de co-autoria do Claude"
+      ]
+    }
+  ]
+}
