@@ -10,13 +10,14 @@ A skill segue o formato aberto [Agent Skills](https://agentskills.io/specificati
 
 - **Lê o diff real**, incluindo arquivos novos (untracked), e evita lockfiles e arquivos gerados em diffs grandes.
 - **Segue a convenção do repositório**: `commitlint` (`type-enum`, `scope-enum`…), idioma do histórico (mesmo quando ele não segue Conventional Commits), escopos, formato de ticket. Sem convenção detectável, usa PT-BR.
-- **Aplica a spec**: tipo correto (`feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `build`, `ci`, `chore`, `style`, `revert`), escopo do módulo dominante, modo imperativo, primeira linha com até 72 caracteres.
+- **Aplica a spec**: tipo correto (`feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `build`, `ci`, `chore`, `style`, `revert`), escopo do módulo dominante, modo imperativo, título medido antes do commit (até 72 caracteres ou o limite do commitlint) e corpo quebrado em 72 colunas.
 - **Detecta breaking changes** (endpoint renomeado, assinatura exportada, schema de banco) e usa `tipo!:` com footer `BREAKING CHANGE:`.
 - **Referencia issues só com evidência clara** (`#123` ou `123-` no branch, ou citada pelo usuário); `oauth2` não vira `Refs: #2`.
 - **Stage seguro**: adiciona arquivos por nome, nunca `git add -A`; deixa `.env`, chaves e artefatos de build de fora e avisa; pergunta a estratégia quando há staged e unstaged misturados; com stage parcial, escreve a mensagem a partir do diff staged.
 - **Procura segredos no conteúdo**: antes de commitar, varre o diff staged atrás de chaves (`sk_live_`, `AKIA…`, `ghp_…`, chave privada) e para se encontrar alguma.
-- **Diff não atômico**: propõe um plano de divisão (arquivos e mensagem de cada commit) e executa depois da aprovação.
-- **Respeita hooks**: nunca usa `--no-verify`; se o pre-commit falha, mostra o erro e propõe a correção.
+- **Diff não atômico**: propõe um plano de divisão (arquivos e mensagem de cada commit), em ordem de dependência, e executa depois da aprovação; se um commit falha no meio, para e informa o que foi feito e o que falta.
+- **Respeita hooks**: nunca usa `--no-verify`; se o pre-commit falha, mostra o erro e propõe a correção; se o `commit-msg` (commitlint) rejeita a mensagem, corrige a própria mensagem e tenta de novo uma vez.
+- **Para no commit local**: nunca faz `git push` sem pedido explícito, nem adiciona footer de co-autoria do agente.
 - **Mostra a mensagem final completa** e commita com heredoc, para que corpo e footers saiam corretos. Candidatos alternativos só quando tipo ou escopo são ambíguos.
 
 ## Instalação
@@ -86,7 +87,7 @@ skills/commit-conventional/
   references/
     exemplos.md               # exemplos por tipo, breaking change, anti-padrões
   evals/
-    evals.json                # 22 casos, expectativas semânticas
+    evals.json                # 27 casos, expectativas semânticas
     files/                    # fixtures: cada setup.sh monta um repositório git descartável
       atomicidade/            # refactor + feature + CI no mesmo diff
       staging-misto/          # staged e unstaged misturados
@@ -99,6 +100,9 @@ skills/commit-conventional/
       stage-parcial/          # arquivo com parte staged e parte não
       segredo-no-codigo/      # chave de API escrita direto no código
       historico-ingles-livre/ # histórico em inglês fora do Conventional Commits
+      commit-msg-hook/        # hook commit-msg que exige escopo
+      plano-falha/            # divisão em 3 commits em que o do meio é barrado
+      sem-push/               # branch com upstream configurado
 ```
 
 `evals/` é usado pelo [skill-creator](https://github.com/anthropics/skills) e ignorado pelas demais ferramentas. `.claude-plugin/plugin.json` na raiz do repositório existe para o marketplace de plugins do Claude Code e serve de manifesto para o skills CLI; também é ignorado pelas outras ferramentas.
@@ -112,9 +116,9 @@ skills/commit-conventional/
 
 Os casos em `evals/evals.json` seguem o schema do [skill-creator](https://github.com/anthropics/skills), com expectativas semânticas avaliadas por um juiz (LLM ou humano).
 
-- **Casos 0 a 9** descrevem o diff no próprio prompt e medem a escolha da mensagem: tipo, escopo, modo imperativo, corpo, footers.
-- **Caso 13** mede ativação negativa: uma pergunta conceitual não deve disparar commit.
-- **Casos 10 a 12 e 14 a 21** usam fixtures em `evals/files/` e medem o comportamento no git. Como um `.git` aninhado não pode ser versionado, cada fixture é um `setup.sh` que monta um repositório descartável:
+- **Casos 0 a 9 e 22** descrevem o diff no próprio prompt e medem a escolha da mensagem: tipo, escopo, modo imperativo, corpo, footers.
+- **Casos 13 e 26** medem ativação negativa: uma pergunta conceitual ou uma consulta ao histórico não deve disparar commit.
+- **Casos 10 a 12, 14 a 21 e 23 a 25** usam fixtures em `evals/files/` e medem o comportamento no git. Como um `.git` aninhado não pode ser versionado, cada fixture é um `setup.sh` que monta um repositório descartável:
 
 ```bash
 bash skills/commit-conventional/evals/files/atomicidade/setup.sh /tmp/repo-atomicidade
