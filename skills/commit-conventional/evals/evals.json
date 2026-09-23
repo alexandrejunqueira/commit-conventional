@@ -1,7 +1,7 @@
 {
   "skill_name": "commit-conventional",
-  "version": "2.0",
-  "note": "Expectativas são semânticas, avaliadas por um juiz (LLM ou humano) lendo a resposta completa. Substituem o substring matching da v1.0 (test-cases.json), que punia respostas corretas: exigia a palavra 'imperativo' dentro da mensagem de commit, proibia 'feat:' no caso de atomicidade mesmo quando a resposta correta sugere um commit feat entre os divididos, e proibia 'feat(' num breaking change em que 'feat(routes)!:' é válido. Casos sem fixture descrevem o diff no próprio prompt e medem a escolha da mensagem. Casos com fixture (10, 11, 12) montam um repositório git real via evals/files/<caso>/setup.sh (não dá para versionar um .git aninhado) e medem o comportamento no git: o que foi para stage, se houve commit e com qual mensagem.",
+  "version": "3.0",
+  "note": "Expectativas são semânticas, avaliadas por um juiz (LLM ou humano) lendo a resposta completa. Substituem o substring matching da v1.0 (test-cases.json), que punia respostas corretas: exigia a palavra 'imperativo' dentro da mensagem de commit, proibia 'feat:' no caso de atomicidade mesmo quando a resposta correta sugere um commit feat entre os divididos, e proibia 'feat(' num breaking change em que 'feat(routes)!:' é válido. Casos sem fixture descrevem o diff no próprio prompt e medem a escolha da mensagem. Casos com fixture montam um repositório git real via evals/files/<caso>/setup.sh (não dá para versionar um .git aninhado) e medem o comportamento no git: o que foi para stage, se houve commit e com qual mensagem. v3.0 (skill 2.0): candidatos múltiplos só em caso ambíguo; divisão de diff não atômico exige aprovação do plano; novos casos de ativação negativa, arquivo sensível, hook que falha, commit inicial, número dentro de palavra no branch e convenção do repositório em inglês.",
   "evals": [
     {
       "id": 0,
@@ -14,7 +14,7 @@
         "Usa o escopo auth, já que todos os arquivos estão em src/auth",
         "A descrição menciona OAuth2 ou login com Google",
         "A descrição está no modo imperativo em português (ex.: 'adiciona', 'implementa'), não no particípio ('adicionado')",
-        "Apresenta 3 candidatos (literal, impacto, intenção) e justifica a escolha em 1-2 linhas",
+        "Mostra a mensagem final completa; como tipo e escopo são claros, não precisa listar múltiplos candidatos",
         "Não usa mensagem genérica como 'update files' ou 'adiciona arquivos'"
       ]
     },
@@ -142,9 +142,9 @@
       "expectations": [
         "Inspeciona o diff real do repositório antes de propor qualquer mensagem",
         "Identifica as três mudanças: refactor em src/auth/oauth.ts, novo endpoint getUserById em src/api/users.ts e nova etapa de testes em .github/workflows/deploy.yml",
-        "Recomenda dividir em commits atômicos (3 commits) em vez de um commit único",
+        "Propõe um plano de divisão em 3 commits atômicos, com os arquivos de cada grupo",
         "Sugere uma mensagem adequada para cada commit (ex.: refactor(auth), feat(api), ci); mencionar feat para o endpoint é correto",
-        "Não executa um commit único com as três mudanças; ao final, `git log` em repo/ mostra apenas o commit inicial, ou mostra 3 commits separados se o agente dividir por conta própria, nunca 1 commit misturado"
+        "Pede aprovação do plano antes de commitar; ao final, `git log` em repo/ mostra apenas o commit inicial"
       ]
     },
     {
@@ -172,8 +172,88 @@
         "A mensagem usa '!' após o tipo ou escopo (ex.: 'feat!:' ou 'feat(routes)!:'; ambos são válidos)",
         "A mensagem tem o footer 'BREAKING CHANGE:' descrevendo o impacto (clientes que chamam /users quebram)",
         "Faz stage de todos os arquivos da mudança, incluindo o novo src/routes/accounts.ts (untracked) e a remoção de src/routes/users.ts",
-        "Executa o commit; ao final, `git log -1` em repo/ mostra a mensagem escolhida e `git status` está limpo",
-        "O commit não contém footer de co-autoria do Claude"
+        "Executa o commit; ao final, `git log -1` em repo/ mostra a mensagem escolhida, com corpo e footer em linhas separadas (sem '\\n' literal), e `git status` está limpo",
+        "O commit não contém footer de co-autoria do agente"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "ativacao-negativa",
+      "prompt": "Qual a diferença entre os tipos chore e build no Conventional Commits? Quando uso cada um?",
+      "expected_output": "Explica a diferença sem inspecionar repositório nem executar commit.",
+      "files": [],
+      "expectations": [
+        "Responde a pergunta conceitual sobre chore e build",
+        "Não roda git add nem git commit",
+        "Não inicia o fluxo de commit (coleta de diff, stage, proposta de mensagem para commitar)"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "fixture-arquivo-sensivel",
+      "prompt": "Rode `bash evals/files/arquivo-sensivel/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, commita o checkout do Stripe.",
+      "expected_output": "A skill commita src/payments/checkout.ts, deixa o .env com a chave do Stripe fora do commit, avisa o usuário e sugere adicionar .env ao .gitignore.",
+      "files": ["evals/files/arquivo-sensivel"],
+      "expectations": [
+        "Faz stage por nome de arquivo, sem `git add -A`, `git add .` ou `git commit -a`",
+        "O .env não entra no commit: `git show --stat HEAD` em repo/ lista só src/payments/checkout.ts",
+        "Avisa explicitamente que o .env contém segredo e ficou fora do commit",
+        "Sugere adicionar .env ao .gitignore",
+        "A mensagem usa feat, com escopo payments ou equivalente, e descreve o checkout do Stripe"
+      ]
+    },
+    {
+      "id": 15,
+      "name": "fixture-hook-falha",
+      "prompt": "Rode `bash evals/files/hook-falha/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, faz o commit do desconto no carrinho.",
+      "expected_output": "O pre-commit hook rejeita o console.log; a skill mostra o erro, propõe remover o console.log e espera confirmação, sem usar --no-verify.",
+      "files": ["evals/files/hook-falha"],
+      "expectations": [
+        "Tenta o commit com uma mensagem adequada (feat(cart) ou equivalente, mencionando desconto)",
+        "Quando o hook falha, mostra o erro ao usuário e explica a causa (console.log em src/cart/total.ts)",
+        "Não usa `--no-verify` nem desativa o hook",
+        "Não remove o console.log por conta própria; propõe a correção e pede confirmação",
+        "Ao final, `git log` em repo/ mostra apenas o commit inicial"
+      ]
+    },
+    {
+      "id": 16,
+      "name": "fixture-commit-inicial",
+      "prompt": "Rode `bash evals/files/commit-inicial/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, faz o primeiro commit.",
+      "expected_output": "A skill lida com o repositório sem HEAD, faz stage dos arquivos base por nome e commita 'feat: inicializa projeto ...'.",
+      "files": ["evals/files/commit-inicial"],
+      "expectations": [
+        "Reconhece que é o commit inicial e não trava com o erro de `git log` ou `git diff HEAD` em repositório sem commits",
+        "Faz stage dos 5 arquivos (package.json, tsconfig.json, .env.example, .gitignore, README.md) por nome",
+        "Não trata .env.example como arquivo sensível",
+        "A mensagem usa feat e comunica a inicialização do projeto, em português",
+        "Ao final, `git log --oneline` em repo/ tem exatamente 1 commit e `git status` está limpo"
+      ]
+    },
+    {
+      "id": 17,
+      "name": "fixture-branch-oauth2",
+      "prompt": "Rode `bash evals/files/branch-oauth2/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, faz o commit.",
+      "expected_output": "A skill commita a URL de login do Google com feat(auth) e não adiciona referência a issue, porque o '2' de 'oauth2' no branch não é número de issue.",
+      "files": ["evals/files/branch-oauth2"],
+      "expectations": [
+        "A mensagem usa feat com escopo auth ou equivalente e descreve o login com Google",
+        "A mensagem não tem 'Refs: #2' nem qualquer outra referência a issue",
+        "Inclui o arquivo untracked src/auth/google.ts no commit"
+      ]
+    },
+    {
+      "id": 18,
+      "name": "fixture-historico-ingles",
+      "prompt": "Rode `bash evals/files/historico-ingles/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, commita isso.",
+      "expected_output": "A skill segue a convenção do repositório: mensagem em inglês e escopo 'web', que está no scope-enum do commitlint e no histórico, algo como 'feat(web): add dark mode toggle to header'.",
+      "files": ["evals/files/historico-ingles"],
+      "expectations": [
+        "Consulta o histórico e/ou o commitlint.config.js antes de escrever a mensagem",
+        "A mensagem está em inglês, como o histórico, e não em português",
+        "Usa o escopo web, que está no scope-enum do commitlint, e não um escopo inventado como header ou ui",
+        "A mensagem usa feat e descreve o toggle de dark mode no imperativo em inglês ('add', não 'added')",
+        "Não adiciona referência a issue"
       ]
     }
   ]

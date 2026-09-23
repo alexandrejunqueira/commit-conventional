@@ -1,146 +1,164 @@
 ---
 name: commit-conventional
-description: Gera commits com mensagens Conventional Commits de alta qualidade em português. Ative sempre que o usuário quiser fazer commit de mudanças no Git, seja com um simples "commit", "commita isso" ou "fazer commit das mudanças". Analisa o diff, gera 3 candidatos de mensagem seguindo a spec Conventional Commits, seleciona o melhor, faz stage dos arquivos relevantes e executa o commit. Detecta diffs não atômicos e recomenda dividir antes de commitar. Ideal para manter histórico limpo e rastreável em monorepos, pipelines de CI/CD e projetos com ADRs.
+description: Cria commits Git com mensagens Conventional Commits. Ative quando o usuário pedir para commitar mudanças, com frases como "commit", "commita isso", "faz o commit", "fazer commit das mudanças" ou "commit this". Lê o diff real, segue a convenção do próprio repositório (idioma, escopos, commitlint), faz stage só dos arquivos relevantes, recusa arquivos sensíveis, detecta diffs não atômicos e propõe como dividi-los. Não ative para explicar a spec Conventional Commits, revisar uma mensagem sem commitar, fazer merge, revert ou rebase.
 license: MIT
-compatibility: Git instalado; repositório Git válido com mudanças staged ou unstaged
+compatibility: Git instalado; repositório Git válido com mudanças a commitar
 metadata:
   author: Alexandre Junqueira
-  version: "1.0.0"
+  version: "2.0.0"
 ---
 
-# Skill: commit-conventional
+# commit-conventional
 
-Automatiza a criação de commits de alta qualidade seguindo a especificação Conventional Commits, com suporte bilíngue e heurísticas para atomicidade.
+Cria commits com mensagens [Conventional Commits](https://www.conventionalcommits.org/) a partir do diff real, respeitando a convenção que o repositório já usa.
 
-## Contexto Automático
+## 1. Coletar contexto
 
-Antes de gerar mensagens, coleta:
-- Branch atual
-- Últimos 5 commits
-- Status do repositório (staged + unstaged)
-- Diff completo (HEAD)
+Rode, nesta ordem:
 
-## Fluxo de Trabalho
-
-### 1. Análise de Mudanças
-Leia o diff completo para entender:
-- **Natureza**: que tipo de mudança foi feita (nova feature, bug, refactor, etc)
-- **Propósito**: por quê a mudança foi feita
-- **Escopo**: qual área/módulo foi afetada
-- **Atomicidade**: se o diff toca múltiplas áreas **não relacionadas**, **recomende dividir em commits atômicos** antes de prosseguir
-
-### 2. Geração de Candidatos
-Gere **3 candidatos** de mensagem de commit usando este template exato:
-
-```
-**Candidato 1 (literal):** `tipo(escopo): descrição`
-**Candidato 2 (impacto):** `tipo(escopo): descrição`
-**Candidato 3 (intenção):** `tipo(escopo): descrição`
-
-**Escolha:** Candidato N — [justificativa em 1 linha]
+```bash
+git status                      # branch, merge/rebase em andamento, detached HEAD, untracked
+git log --oneline -15           # convenção do histórico (falha em repositório sem commits: é o commit inicial)
+git diff --stat HEAD            # tamanho e distribuição da mudança (sem HEAD: git diff --cached --stat)
 ```
 
-Cada candidato deve seguir a spec abaixo.
+Depois leia o conteúdo:
 
-### 3. Seleção e Justificativa
-Escolha o melhor candidato com **1-2 linhas de raciocínio**. Critérios:
-- Clareza da descrição imperativa
-- Relevância do escopo
-- Aderência à spec (tamanho, tipo correto)
-- Precisão quanto ao propósito das mudanças
+- `git diff HEAD -- <arquivos>` para arquivos rastreados. Não leia lockfiles (`*.lock`, `package-lock.json`), build (`dist/`, `build/`), arquivos minificados ou gerados, a menos que sejam a mudança inteira.
+- Arquivos **untracked** não aparecem no `git diff`. Leia-os diretamente (os listados em `git status` ou `git ls-files --others --exclude-standard`).
+- Em diff grande, comece pelo `--stat` e leia os arquivos mais relevantes, não tudo.
 
-### 4. Staging
-- Se houver apenas unstaged changes, faça `git add` dos arquivos relevantes
-- Se houver staged changes, respeite e não altere
-- Se mixed (staged + unstaged), pergunte ao usuário qual estratégia usar
+Procure também configuração de convenção: `commitlint.config.*`, `.commitlintrc*`, `.czrc`, campo `commitlint` no `package.json`, seção de commits em `CONTRIBUTING.md`.
 
-### 5. Commit
-Execute o commit com a mensagem escolhida usando `git commit -m`.
+## 2. Pré-condições (pare e avise se falhar)
 
-## Especificação de Mensagem
+- **Merge, rebase, cherry-pick ou revert em andamento** (informado pelo `git status`): não use esta skill; oriente o usuário a concluir a operação com o próprio git.
+- **Detached HEAD**: avise e pergunte se deve criar um branch antes.
+- **Nada a commitar**: diga isso e pare.
 
-### Formato Padrão
+## 3. Descobrir a convenção do repositório
+
+A convenção do repositório vence os padrões desta skill. Em ordem de prioridade:
+
+1. **Config de commitlint/commitizen**: respeite `type-enum`, `scope-enum`, `subject-case`, `header-max-length` e similares.
+2. **Histórico** (`git log`), quando a maioria dos commits já segue Conventional Commits:
+   - **Idioma**: escreva no idioma predominante. Se o histórico é em inglês, a mensagem é em inglês.
+   - **Escopos**: reutilize os escopos existentes em vez de inventar nomes novos. Se o histórico não usa escopo, não use.
+   - **Referências**: copie o formato de ticket usado (`Refs: #123`, `Closes #123`, `ABC-123`).
+3. **Sem convenção detectável** (repositório novo ou histórico fora do padrão): use os padrões abaixo, com mensagem em **português (PT-BR)**.
+
+## 4. Analisar a mudança
+
+- **Natureza**: que tipo de mudança é (tabela de tipos abaixo).
+- **Propósito**: por que foi feita. É isso que vai no corpo.
+- **Escopo**: qual módulo ou área foi afetado.
+- **Atomicidade**: se a mudança faz uma coisa só (seção 6).
+- **Breaking change**: remove ou renomeia endpoint público, muda assinatura de função exportada, altera schema de banco ou formato de config de forma incompatível.
+
+## 5. Stage
+
+Nunca use `git add -A`, `git add .` ou `git commit -a`. Adicione **por nome**: `git add -- <arquivo> ...`.
+
+| Estado | Ação |
+|---|---|
+| Nada staged | Faça stage dos arquivos relevantes da mudança, incluindo untracked que pertencem a ela |
+| Só há mudanças staged | Commite exatamente o que está staged; não adicione nada |
+| Staged **e** outras mudanças (unstaged ou untracked) | Pergunte a estratégia: só o staged, incluir tudo, ou dividir. Não altere o stage antes da resposta |
+
+**Arquivos sensíveis ou indevidos** nunca entram por iniciativa da skill: `.env*` (exceto `.env.example`), `*.pem`, `*.key`, `*.p12`, `id_rsa*`, arquivos de credenciais, arquivos com cara de segredo (tokens, chaves de API), binários grandes e artefatos de build fora do `.gitignore`. Deixe-os fora do stage, avise o usuário e sugira adicioná-los ao `.gitignore`. Se o próprio usuário já os colocou no stage, avise e peça confirmação antes de commitar.
+
+## 6. Atomicidade
+
+Um commit deve fazer **uma coisa**. O critério é semântico, não contagem de diretórios:
+
+- **Não atômico**: mudanças independentes que poderiam ser revertidas separadamente. Ex.: refactor de auth + endpoint novo + ajuste de pipeline de CI.
+- **Atômico**, mesmo tocando várias pastas: uma feature com seu código, seus testes e sua documentação; um rename com todas as referências atualizadas; um bump de dependência com os ajustes que ele exigiu.
+
+Se não for atômico, **não commite**. Proponha um plano e peça aprovação:
 
 ```
-<tipo>(<escopo opcional>): <descrição imperativa em PT-BR>
+⚠️ Estas mudanças fazem 3 coisas independentes. Proposta de divisão:
 
-[corpo opcional — o quê e por quê, não o como]
+1. refactor(auth): extrai troca de token para função própria
+   src/auth/oauth.ts
+2. feat(api): adiciona busca de usuário por id
+   src/api/users.ts
+3. ci: executa testes antes do build no deploy
+   .github/workflows/deploy.yml
 
-[footer opcional — refs, breaking changes]
+Posso commitar nessa ordem?
 ```
 
-### Tipos Válidos
+Com a aprovação, faça um commit por grupo (`git add -- <arquivos do grupo>` e commit), na ordem proposta.
+
+**Limite**: se um mesmo arquivo contém mudanças de grupos diferentes, a divisão exige stage por trecho (`git add -p`), que é interativo. Não tente simular. Diga ao usuário qual arquivo mistura as mudanças e ofereça: commitar esse arquivo junto com um dos grupos (explicando no corpo), ou o usuário faz o `git add -p` e a skill commita o resto.
+
+## 7. Escrever a mensagem
+
+```
+<tipo>(<escopo opcional>)<! se breaking>: <descrição imperativa>
+
+[corpo opcional: o quê e por quê, não o como]
+
+[footers opcionais: BREAKING CHANGE, referências]
+```
+
+### Tipos
 
 | Tipo | Uso |
-|------|-----|
+|---|---|
 | `feat` | Nova funcionalidade |
 | `fix` | Correção de bug |
 | `docs` | Apenas documentação |
-| `style` | Formatação, sem lógica |
-| `refactor` | Refatoração sem feature/fix |
+| `style` | Formatação, sem mudança de lógica |
+| `refactor` | Reestruturação sem mudar comportamento |
 | `perf` | Melhoria de performance |
-| `test` | Adicionar/corrigir testes |
-| `chore` | Build, deps, configuração |
-| `ci` | Mudanças de CI/CD |
+| `test` | Adiciona ou corrige testes |
+| `build` | Sistema de build, bundler, dependências que afetam o build |
+| `ci` | Pipelines e configuração de CI/CD |
+| `chore` | Manutenção que não se encaixa acima (deps, configs, tarefas) |
+| `revert` | Reverte commit anterior (prefira `git revert`) |
 
-### Regras de Escopo
+### Regras
 
-- Use escopo se **>70% dos arquivos modificados pertencem ao mesmo módulo/diretório** identificável
-  - Ex: 8 de 10 arquivos em `src/auth/` → `feat(auth):`
-- **Omita** se mudanças estão distribuídas por múltiplos módulos sem um dominante claro
-- Exemplos válidos: `feat(auth):`, `fix(api):`, `docs(setup):`
+1. **Descrição no imperativo**: "adiciona", "corrige", "remove" ("add", "fix", "remove" em inglês). Não "adicionado", "adicionando".
+2. **Primeira linha com até 72 caracteres**, sem ponto final.
+3. **Escopo**: o módulo dominante da mudança, preferindo escopos que já existem no histórico. Omita se a mudança não tem área dominante.
+4. **Corpo** quando o porquê não é óbvio pela descrição: workarounds, decisões, números medidos (ex.: "query cai de 2.3s para 80ms"). Não descreva linha a linha o que o diff já mostra.
+5. **Breaking change**: `!` antes dos dois-pontos **e** footer `BREAKING CHANGE: <impacto para quem consome>`.
+6. **Referências a issues**, só quando houver evidência clara:
+   - o usuário citou a issue no pedido;
+   - o branch tem `#123`, ou começa com o número após o prefixo (`feat/123-login`, `123-login`), ou tem id de ticket (`feat/ABC-123-login`).
+   - Números dentro de palavras **não** são issue: `oauth2`, `v14`, `next14`, `utf8`.
+   - Bug de projeto externo vai no corpo com o nome completo (`vercel/next.js#58843`), não como `Refs: #58843`.
+7. **Proibido**: mensagens genéricas ("update files", "fix bug", "ajustes", "WIP"), e footer de co-autoria do agente, exceto se a convenção do repositório exigir atribuição de IA.
+8. **Commit inicial** (repositório sem commits): `feat: inicializa projeto com <o essencial>`, salvo convenção diferente.
 
-### Heurísticas
+### Quando houver dúvida real
 
-1. **Modo imperativo**: Use "adiciona", "corrige", "refatora" — não "adicionado", "corrigido"
-2. **Primeira linha ≤ 72 caracteres**: Facilita leitura em logs compactos
-3. **Sem footer de co-autoria do Claude**: Claude não é co-autor
-4. **Mensagens genéricas são proibidas**: "update files", "fix bug", "various changes"
-5. **Breaking changes**: Se o diff remover/renomear endpoint público, alterar assinatura de função exportada ou mudar schema de banco — use `tipo!:` e adicione footer `BREAKING CHANGE: <descrição do impacto>`
-6. **Referências a issues**: Busque padrão `#\d+` ou sequência numérica no nome do branch (ex: `feat/123-login` → `#123`) e no diff. Se encontrada, adicione footer `Refs: #123`
+Se o tipo ou o escopo for genuinamente ambíguo (ex.: `fix` ou `refactor`; dois módulos com peso parecido), mostre 2 ou 3 candidatos e justifique a escolha em uma linha. Nos casos claros, vá direto para a mensagem final.
 
-### Atomicidade
+## 8. Commitar
 
-Um diff é **não-atômico** se qualquer uma dessas condições for verdadeira:
-- Toca **mais de 2 diretórios top-level distintos e não relacionados** (ex: `src/` + `infra/` + `docs/`)
-- Combina **tipos diferentes de mudança** sem relação direta (ex: nova feature + bug fix + CI)
+Mostre a mensagem final **completa** (título, corpo e footers) e execute com heredoc, para que corpo e footers saiam em linhas corretas:
 
-Se não-atômico, **pare e recomende**:
+```bash
+git commit -F - <<'EOF'
+fix(auth): renova token antes de expirar
 
+O refresh só acontecia após o 401, e requisições em paralelo
+falhavam juntas durante a renovação.
+
+Refs: #214
+EOF
 ```
-⚠️ Este diff toca múltiplas áreas não relacionadas:
-  - Refactor de autenticação
-  - Nova API de usuários
-  - Mudança de workflow CI
 
-Recomendo dividir em 3 commits atômicos antes de prosseguir.
-Quer que eu o ajude a selecionar qual fazer primeiro?
-```
-
-## Casos Especiais
-
-### Repositório Vazio / Commits Iniciais
-- Use `feat:` mesmo para commit inicial
-- Exemplo: `feat: inicializa projeto com setup base`
-
-### Merge Commits e Revert
-- Não use esta skill — use `git merge`, `git revert` nativamente
-
-### Múltiplas Linguagens
-- Mesmo propósito → 1 commit
-- Refactor por linguagem → múltiplos commits atômicos
-
-## Troubleshooting
-
-| Problema | Solução |
-|----------|---------|
-| "No changes staged" | Faça `git add .` ou `git add <files>` primeiro |
-| "Nothing to commit" | Verifique se há changes com `git status` |
-| Diff muito grande | Sugira dividir em commits menores e atômicos |
-| Escopo ambíguo | Pergunte ao usuário: "Qual é o módulo/feature principal?" |
+- Nunca use `--no-verify`, `--amend` ou `--allow-empty` sem pedido explícito.
+- **Hook de pre-commit falhou**: mostre o erro, explique a causa e proponha a correção. Não corrija o código do usuário nem tente de novo sem confirmação.
+- **Hook reformatou arquivos** (formatter automático): faça stage de novo **só dos mesmos arquivos** e repita o commit uma vez.
+- Depois do commit, mostre `git log --oneline -1` e o `git status` resumido, deixando claro o que ficou fora do commit.
 
 ## Referências
 
-- Exemplos detalhados: `references/exemplos.md`
+- Exemplos por tipo, breaking change e anti-padrões: `references/exemplos.md`
 - Casos de teste: `evals/evals.json`
-- Script helper: `scripts/commit-helper.sh`

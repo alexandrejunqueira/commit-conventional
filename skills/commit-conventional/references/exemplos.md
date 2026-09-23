@@ -1,141 +1,162 @@
 # Exemplos de Commits Conventional
 
+Exemplos em PT-BR, o padrão quando o repositório não tem convenção própria. Se o histórico é em inglês, siga o histórico (ver seção 9).
+
 ## 1. Feature (feat)
 
 ```
-feat(auth): adiciona login com OAuth2 Google
+feat(auth): adiciona login com OAuth2 do Google
 
-Implementa fluxo completo de autenticação via OAuth2,
+Implementa o fluxo completo de autenticação via OAuth2,
 incluindo troca de código por token e persistência em sessão.
 
 Refs: #142
 ```
 
 ```
-feat: implementa sistema de cache em memória
+feat: implementa cache em memória para consultas repetidas
 
-Adiciona estratégia LRU de cache com TTL configurável,
-reduzindo latência de queries repetidas em 80%.
+Estratégia LRU com TTL configurável; reduz a latência de
+consultas repetidas em 80%.
 ```
 
 ## 2. Fix (fix)
 
 ```
-fix(validation): corrige regex de validação de email
+fix(validation): corrige validação de email com '+'
 
-A regex anterior aceitava emails inválidos com múltiplos @.
-Nova implementação usa RFC 5322 simplificado.
+A regex anterior rejeitava endereços válidos como
+nome+tag@dominio.com, bloqueando cadastros.
 
 Refs: #89
 ```
 
 ```
-fix: evita race condition em transações simultâneas
+fix: evita race condition em atualizações de saldo simultâneas
 
-Adiciona lock pessimista em atualização de saldo,
-prevenindo condição de corrida identificada em teste E2E.
+Duas transações concorrentes podiam ler o mesmo saldo e
+sobrescrever uma à outra; o teste E2E de pagamentos reproduzia.
 ```
 
 ## 3. Refactor (refactor)
 
 ```
-refactor(parser): extrai lógica de tokenização em módulo próprio
+refactor(parser): extrai tokenização para módulo próprio
 
-Move tokenização de `parser.js` para `tokenizer.js`,
-reduzindo complexidade ciclomática de 12 para 6.
-
-Sem mudança de comportamento. Todos os testes passam.
+Reduz a complexidade ciclomática do parser de 12 para 6.
+Sem mudança de comportamento.
 ```
 
 ```
-refactor: migra arquivos de src/utils para src/lib/utils
-
-Reorganiza estrutura de diretórios para melhor escalabilidade.
-Atualiza 23 imports em toda a aplicação.
+refactor: move src/utils para src/lib/utils
 ```
 
 ## 4. Docs (docs)
 
 ```
-docs(api): adiciona seção de autenticação no README
+docs(auth): documenta fluxo OAuth2 no README
 
-Documenta fluxo de OAuth2, variáveis de ambiente necessárias
-e exemplo de cliente Python.
+Inclui variáveis de ambiente necessárias e um exemplo de cliente.
 ```
 
 ```
-docs: escreve ADR-003 sobre decisão de cache em memória
-
-Registra trade-offs entre Redis vs cache local.
+docs: registra ADR-003 sobre cache em memória
 ```
 
 ## 5. Test (test)
 
 ```
-test(auth): adiciona testes de timeout de sessão
+test(auth): cobre expiração de sessão
 
-Cobertura sobe de 67% para 89% em módulo auth.
+Cobertura do módulo auth sobe de 67% para 89%.
 ```
 
-## 6. Chore (chore)
+## 6. Chore e build (chore, build)
 
 ```
 chore(deps): atualiza Next.js de 14.0 para 14.1
 
-Inclui breaking change: exports no App Router.
-Atualiza 3 componentes que usavam exports deprecados.
+Ajusta 3 componentes que usavam exports depreciados na 14.1.
+```
+
+```
+build: troca webpack por Vite no bundle do frontend
 ```
 
 ## 7. Performance (perf)
 
 ```
-perf(db): adiciona índice em coluna created_at
+perf(db): adiciona índice em users.created_at
 
-Queries de filtro por data sobem de 2.3s para 80ms.
+A listagem filtrada por data cai de 2.3s para 80ms.
 ```
 
-## 8. Breaking Change
+## 8. Breaking change
+
+`!` no título **e** footer `BREAKING CHANGE` descrevendo o impacto para quem consome:
 
 ```
-feat(api): renomeia endpoint /users para /people
+feat(api)!: renomeia endpoint /users para /accounts
 
-BREAKING CHANGE: clients usando /users precisam atualizar
-para /people. Estrutura de resposta também mudou.
+BREAKING CHANGE: clientes que chamam /users e /users/:id
+precisam migrar para /accounts e /accounts/:id.
 
 Refs: #156
 ```
 
+Atualizar uma dependência que tem breaking change **não** é breaking change do seu projeto, desde que a sua API pública continue igual. Use `chore(deps)` ou `build` e explique os ajustes no corpo.
+
+## 9. Repositório com histórico em inglês
+
+Se o `git log` é em inglês e usa escopos, siga:
+
+```
+feat(web): add dark mode toggle to header
+```
+
+## 10. Workaround para bug externo
+
+```
+fix(csp): define nonce manual no header Content-Security-Policy
+
+Workaround para vercel/next.js#58843: o nonce gerado
+automaticamente não chega aos scripts inline.
+```
+
 ---
 
-## Padrões Ruins (Evitar)
+## Padrões ruins (evitar)
 
-❌ `update files` — sem tipo, sem escopo, sem contexto
-❌ `fix bug` — qual bug? qual escopo?
-❌ `WIP: doing stuff` — commit apenas de mudanças prontas
-❌ `HOTFIX: critical urgente!!!` — use `fix:` com contexto no corpo
-
----
-
-## Checklist de Atomicidade
-
-- [ ] Este commit faz **uma coisa** bem definida?
-- [ ] Poderia ser revertido sem quebrar outra coisa?
-- [ ] Os testes passam após este commit?
-- [ ] A mensagem explica o **por quê**, não o **como**?
+| Mensagem | Problema |
+|---|---|
+| `update files` | Sem tipo, sem escopo, sem propósito |
+| `fix bug` | Qual bug? Onde? |
+| `WIP: doing stuff` | Commit só de mudança pronta |
+| `HOTFIX: critical urgente!!!` | Use `fix:` e explique a urgência no corpo |
+| `feat(auth): adicionado login` | Particípio; use o imperativo |
+| `feat(api): renomeia /users` sem `!` e sem footer | Breaking change escondido |
+| `feat: oauth2 google` + `Refs: #2` | O `2` de `oauth2` não é issue |
 
 ---
 
-## Escopos Comuns em Monorepos (Pulsar)
+## Checklist de atomicidade
+
+- [ ] O commit faz **uma coisa** bem definida?
+- [ ] Pode ser revertido sem quebrar outra coisa?
+- [ ] A mensagem explica o **porquê**, não o como?
+
+---
+
+## Escopos comuns
+
+Nomes de módulo ou área, nunca nomes de tipo (`ci`, `docs`, `build`, `test` são tipos, não escopos). Se o histórico já usa outros escopos, eles vencem esta lista.
 
 | Escopo | Uso |
-|--------|-----|
+|---|---|
 | `auth` | Autenticação e autorização |
 | `api` | APIs REST/GraphQL |
 | `db` | Schema, migrations, queries |
-| `ui` | Componentes React, layout |
+| `ui` | Componentes, layout |
 | `validation` | Schemas, regras de validação |
-| `config` | Configuração, env vars |
-| `ci` | GitHub Actions, deploy |
-| `docs` | Documentação, ADRs |
-| `deps` | Dependências |
-| `build` | Build process, bundler |
+| `config` | Configuração, variáveis de ambiente |
+| `deps` | Dependências (com `chore` ou `build`) |

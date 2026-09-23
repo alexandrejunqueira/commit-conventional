@@ -1,7 +1,7 @@
 {
   "name": "commit-conventional",
-  "version": "1.0.0",
-  "description": "Commits com mensagens Conventional Commits em português: analisa o diff, gera 3 candidatos, detecta diffs não atômicos e executa o commit.",
+  "version": "2.0.0",
+  "description": "Commits Conventional Commits a partir do diff real: segue a convenção do repositório, faz stage seguro, recusa segredos, detecta breaking changes e divide diffs não atômicos.",
   "author": {
     "name": "Alexandre Junqueira"
   },

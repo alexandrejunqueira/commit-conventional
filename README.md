@@ -2,19 +2,21 @@
 
 Agent Skill que faz o coding agent criar commits com mensagens **Conventional Commits em português**, com histórico limpo e atômico.
 
-A premissa: coding agents commitam rápido demais. Sem freio, geram "update files", misturam refactor, feature e CI no mesmo commit e esquecem o `BREAKING CHANGE` quando renomeiam um endpoint público. Esta skill força o agente a ler o diff real, comparar 3 candidatos de mensagem e parar quando o diff não é atômico.
+A premissa: coding agents commitam rápido demais. Sem freio, geram "update files", fazem `git add -A` e levam um `.env` junto, misturam refactor, feature e CI no mesmo commit, ignoram a convenção que o repositório já usa e esquecem o `BREAKING CHANGE` quando renomeiam um endpoint público. Esta skill força o agente a ler o diff real, seguir a convenção do repositório e parar quando o commit não é seguro ou não é atômico.
 
 A skill segue o formato aberto [Agent Skills](https://agentskills.io/specification) e funciona sem modificação em **Claude Code, OpenAI Codex, OpenCode, Cursor, Gemini CLI e GitHub Copilot**. O que muda entre ferramentas é só o diretório de instalação e a forma de invocar.
 
 ## O que ela faz
 
-- **Analisa o diff** (branch, últimos commits, staged e unstaged) antes de propor qualquer mensagem.
-- **Gera 3 candidatos** (literal, impacto, intenção) e escolhe o melhor com uma justificativa curta.
-- **Aplica a spec**: tipo correto (`feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `chore`, `ci`, `style`), escopo quando mais de 70% dos arquivos são do mesmo módulo, modo imperativo, primeira linha com até 72 caracteres.
+- **Lê o diff real**, incluindo arquivos novos (untracked), e evita lockfiles e arquivos gerados em diffs grandes.
+- **Segue a convenção do repositório**: `commitlint` (`type-enum`, `scope-enum`…), idioma e escopos do histórico, formato de ticket. Sem convenção detectável, usa PT-BR.
+- **Aplica a spec**: tipo correto (`feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `build`, `ci`, `chore`, `style`, `revert`), escopo do módulo dominante, modo imperativo, primeira linha com até 72 caracteres.
 - **Detecta breaking changes** (endpoint renomeado, assinatura exportada, schema de banco) e usa `tipo!:` com footer `BREAKING CHANGE:`.
-- **Referencia issues** encontradas no nome do branch ou no diff com `Refs: #123`.
-- **Para quando o diff não é atômico** e recomenda dividir em commits separados.
-- **Respeita o stage**: se há mudanças staged e unstaged misturadas, pergunta a estratégia em vez de decidir sozinha.
+- **Referencia issues só com evidência clara** (`#123` ou `123-` no branch, ou citada pelo usuário); `oauth2` não vira `Refs: #2`.
+- **Stage seguro**: adiciona arquivos por nome, nunca `git add -A`; deixa `.env`, chaves e artefatos de build de fora e avisa; pergunta a estratégia quando há staged e unstaged misturados.
+- **Diff não atômico**: propõe um plano de divisão (arquivos e mensagem de cada commit) e executa depois da aprovação.
+- **Respeita hooks**: nunca usa `--no-verify`; se o pre-commit falha, mostra o erro e propõe a correção.
+- **Mostra a mensagem final completa** e commita com heredoc, para que corpo e footers saiam corretos. Candidatos alternativos só quando tipo ou escopo são ambíguos.
 
 ## Instalação
 
@@ -79,17 +81,20 @@ Em todas as ferramentas a skill é ativada automaticamente quando o pedido bate 
 
 ```
 skills/commit-conventional/
-  SKILL.md                    # instruções principais: fluxo, spec, heurísticas, atomicidade
+  SKILL.md                    # fluxo: contexto, pré-condições, convenção, stage, atomicidade, mensagem, commit
   references/
-    exemplos.md               # exemplos detalhados por tipo de commit
-  scripts/
-    commit-helper.sh          # coleta branch, commits recentes, staged/unstaged e tamanho do diff
+    exemplos.md               # exemplos por tipo, breaking change, anti-padrões
   evals/
-    evals.json                # 13 casos, expectativas semânticas
-    files/
-      atomicidade/            # fixture: refactor + feature + CI no mesmo diff
-      staging-misto/          # fixture: staged e unstaged misturados
-      breaking-change/        # fixture: endpoint /users renomeado para /accounts
+    evals.json                # 19 casos, expectativas semânticas
+    files/                    # fixtures: cada setup.sh monta um repositório git descartável
+      atomicidade/            # refactor + feature + CI no mesmo diff
+      staging-misto/          # staged e unstaged misturados
+      breaking-change/        # endpoint /users renomeado para /accounts
+      arquivo-sensivel/       # .env com segredo fora do .gitignore
+      hook-falha/             # pre-commit que rejeita console.log
+      commit-inicial/         # repositório sem nenhum commit
+      branch-oauth2/          # número dentro de palavra no nome do branch
+      historico-ingles/       # histórico em inglês + commitlint com scope-enum
 ```
 
 `evals/` é usado pelo [skill-creator](https://github.com/anthropics/skills) e ignorado pelas demais ferramentas. `.claude-plugin/plugin.json` na raiz do repositório existe para o marketplace de plugins do Claude Code e serve de manifesto para o skills CLI; também é ignorado pelas outras ferramentas.
@@ -97,15 +102,15 @@ skills/commit-conventional/
 ## Compatibilidade
 
 - O frontmatter do `SKILL.md` usa apenas campos do spec (`name`, `description`, `license`, `compatibility`, `metadata`). Nenhum campo exclusivo de uma ferramenta.
-- O corpo não depende de tool, hook, servidor MCP ou slash command. Só precisa de um agente que execute comandos `git` no terminal, o que todas as ferramentas listadas fazem. As referências a `references/`, `scripts/` e `evals/` são caminhos relativos à raiz da skill, como o spec pede.
-- `scripts/commit-helper.sh` requer Bash. É opcional: o agente pode coletar o mesmo contexto com `git status`, `git log` e `git diff`.
+- O corpo não depende de tool, hook, servidor MCP, slash command ou script próprio. Só precisa de um agente que execute comandos `git` no terminal, o que todas as ferramentas listadas fazem. As referências a `references/` e `evals/` são caminhos relativos à raiz da skill, como o spec pede.
 
 ## Evals
 
 Os casos em `evals/evals.json` seguem o schema do [skill-creator](https://github.com/anthropics/skills), com expectativas semânticas avaliadas por um juiz (LLM ou humano).
 
 - **Casos 0 a 9** descrevem o diff no próprio prompt e medem a escolha da mensagem: tipo, escopo, modo imperativo, corpo, footers.
-- **Casos 10 a 12** usam fixtures em `evals/files/` e medem o comportamento no git. Como um `.git` aninhado não pode ser versionado, cada fixture é um `setup.sh` que monta um repositório descartável:
+- **Caso 13** mede ativação negativa: uma pergunta conceitual não deve disparar commit.
+- **Casos 10 a 12 e 14 a 18** usam fixtures em `evals/files/` e medem o comportamento no git. Como um `.git` aninhado não pode ser versionado, cada fixture é um `setup.sh` que monta um repositório descartável:
 
 ```bash
 bash skills/commit-conventional/evals/files/atomicidade/setup.sh /tmp/repo-atomicidade
