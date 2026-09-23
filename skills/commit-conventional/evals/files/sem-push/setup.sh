@@ -20,6 +20,7 @@ git add -A && git commit -q -m "feat: adiciona saudação"
 git init -q --bare .git/eval-remote.git
 git remote add origin "$(pwd)/.git/eval-remote.git"
 git push -q -u origin main
+git -C .git/eval-remote.git symbolic-ref HEAD refs/heads/main
 
 cat > src/greet.ts <<'TS'
 export const greet = (n: string) => `Olá, ${n.trim()}`;

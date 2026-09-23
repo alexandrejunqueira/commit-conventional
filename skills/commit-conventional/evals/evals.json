@@ -1,7 +1,7 @@
 {
   "skill_name": "commit-conventional",
-  "version": "3.2",
-  "note": "Expectativas são semânticas, avaliadas por um juiz (LLM ou humano) lendo a resposta completa. Substituem o substring matching da v1.0 (test-cases.json), que punia respostas corretas: exigia a palavra 'imperativo' dentro da mensagem de commit, proibia 'feat:' no caso de atomicidade mesmo quando a resposta correta sugere um commit feat entre os divididos, e proibia 'feat(' num breaking change em que 'feat(routes)!:' é válido. Casos sem fixture descrevem o diff no próprio prompt e medem a escolha da mensagem. Casos com fixture montam um repositório git real via evals/files/<caso>/setup.sh (não dá para versionar um .git aninhado) e medem o comportamento no git: o que foi para stage, se houve commit e com qual mensagem. v3.0 (skill 2.0): candidatos múltiplos só em caso ambíguo; divisão de diff não atômico exige aprovação do plano; novos casos de ativação negativa, arquivo sensível, hook que falha, commit inicial, número dentro de palavra no branch e convenção do repositório em inglês. v3.1 (skill 2.1): mensagem lida do diff staged quando há stage parcial, varredura de segredo no conteúdo do diff e idioma do histórico mesmo fora do Conventional Commits. v3.2 (skill 2.2): título medido antes do commit, corpo quebrado em 72 colunas, hook commit-msg corrigido pela própria skill, parada limpa quando um commit do plano falha, sem push e ativação negativa para consulta ao histórico.",
+  "version": "3.3",
+  "note": "Expectativas são semânticas, avaliadas por um juiz (LLM ou humano) lendo a resposta completa. Substituem o substring matching da v1.0 (test-cases.json), que punia respostas corretas: exigia a palavra 'imperativo' dentro da mensagem de commit, proibia 'feat:' no caso de atomicidade mesmo quando a resposta correta sugere um commit feat entre os divididos, e proibia 'feat(' num breaking change em que 'feat(routes)!:' é válido. Casos sem fixture descrevem o diff no próprio prompt e medem a escolha da mensagem. Casos com fixture montam um repositório git real via evals/files/<caso>/setup.sh (não dá para versionar um .git aninhado) e medem o comportamento no git: o que foi para stage, se houve commit e com qual mensagem. v3.0 (skill 2.0): candidatos múltiplos só em caso ambíguo; divisão de diff não atômico exige aprovação do plano; novos casos de ativação negativa, arquivo sensível, hook que falha, commit inicial, número dentro de palavra no branch e convenção do repositório em inglês. v3.1 (skill 2.1): mensagem lida do diff staged quando há stage parcial, varredura de segredo no conteúdo do diff e idioma do histórico mesmo fora do Conventional Commits. v3.2 (skill 2.2): título medido antes do commit, corpo quebrado em 72 colunas, hook commit-msg corrigido pela própria skill, parada limpa quando um commit do plano falha, sem push e ativação negativa para consulta ao histórico. v3.3: corrige 4 casos que não mediam o que prometiam na primeira rodada de benchmark. 14: escopo opcional, já que o histórico do fixture não usa escopo. 23: a regra de escopo vem de um config compartilhado em node_modules, invisível lendo só o hook. 24: o usuário fixa a ordem, com o commit que falha no meio. 25: HEAD do remote bare apontava para master; o pedido agora tenta a fazer push.",
   "evals": [
     {
       "id": 0,
@@ -200,7 +200,7 @@
         "O .env não entra no commit: `git show --stat HEAD` em repo/ lista só src/payments/checkout.ts",
         "Avisa explicitamente que o .env contém segredo e ficou fora do commit",
         "Sugere adicionar .env ao .gitignore",
-        "A mensagem usa feat, com escopo payments ou equivalente, e descreve o checkout do Stripe"
+        "A mensagem usa feat e descreve o checkout do Stripe; sem escopo (o histórico do repositório não usa) ou com escopo payments"
       ]
     },
     {
@@ -316,40 +316,42 @@
       "id": 23,
       "name": "fixture-commit-msg-hook",
       "prompt": "Rode `bash evals/files/commit-msg-hook/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, commita a limpeza do carrinho.",
-      "expected_output": "O primeiro commit, sem escopo como o histórico, é rejeitado pelo hook commit-msg; a skill lê o erro, adiciona o escopo cart e commita na segunda tentativa, sem pedir confirmação e sem --no-verify.",
+      "expected_output": "A regra de escopo (cart ou api) só aparece rodando o commitlint ou no erro do hook. A skill valida a mensagem antes (npx commitlint) ou, se o hook rejeitar, corrige a própria mensagem e tenta de novo uma vez; chega a feat(cart) sem pedir confirmação e sem --no-verify.",
       "files": ["evals/files/commit-msg-hook"],
       "expectations": [
-        "Quando o hook commit-msg rejeita a mensagem, reconhece que o problema é a mensagem, não o código",
-        "Ajusta a mensagem usando um escopo permitido pelo hook (cart) e tenta de novo sem pedir confirmação ao usuário",
-        "Não usa `--no-verify` nem desativa o hook",
-        "Tenta no máximo duas vezes; não entra em laço de tentativas",
-        "Ao final, `git log -1 --format=%s` em repo/ começa com 'feat(cart):' e `git status` está limpo"
+        "Descobre a regra de escopo obrigatório, seja validando a mensagem com o commitlint antes do commit, seja pelo erro do hook commit-msg",
+        "Se o hook rejeitar a mensagem, ajusta a própria mensagem e tenta de novo sem pedir confirmação ao usuário (se não houve rejeição porque validou antes, também passa)",
+        "Não usa `--no-verify`, não desativa o hook e não altera commitlint.config.js nem node_modules",
+        "Faz no máximo duas tentativas de `git commit`; não entra em laço",
+        "Ao final, `git log -1 --format=%s` em repo/ começa com 'feat(cart):' e `git status` está limpo",
+        "Não termina parado pedindo ao usuário que resolva o escopo ou confirme a nova mensagem"
       ]
     },
     {
       "id": 24,
       "name": "fixture-plano-falha",
-      "prompt": "Rode `bash evals/files/plano-falha/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, faz o commit. Se precisar dividir em vários commits, pode seguir com o plano sem me perguntar.",
-      "expected_output": "A skill divide em três commits (docs, feat da busca por id, ci). O commit do feat é barrado pelo pre-commit por causa do console.log; a skill para ali, informa o que já foi commitado, o que falhou e o que falta, e não segue para os grupos seguintes.",
+      "prompt": "Rode `bash evals/files/plano-falha/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, faz o commit em 3 commits, nesta ordem: primeiro a doc (docs/api.md), depois a busca por id (src/api/users.ts), por último o CI (.github/workflows/ci.yml). Pode seguir sem me perguntar.",
+      "expected_output": "O commit da doc entra; o da busca por id é barrado pelo pre-commit por causa do console.log; a skill para ali, não commita o CI, e informa o que foi feito, o que falhou e o que falta.",
       "files": ["evals/files/plano-falha"],
       "expectations": [
-        "Identifica três mudanças independentes: docs em docs/api.md, getUserById em src/api/users.ts e etapa de testes em .github/workflows/ci.yml",
-        "Quando o commit de src/api/users.ts falha no pre-commit, não segue para os grupos que ainda não foram commitados",
-        "Informa quais commits já foram feitos (com hash ou título), qual falhou e por quê (console.log em src/api/users.ts), e quais grupos faltam",
-        "Não remove o console.log por conta própria, não usa `--no-verify` e não desfaz os commits já feitos",
-        "Ao final, `git log` em repo/ não contém commit com src/api/users.ts, e as mudanças dos grupos não commitados continuam na árvore de trabalho"
+        "Commita docs/api.md primeiro, como o usuário pediu",
+        "Quando o commit de src/api/users.ts falha no pre-commit, NÃO commita .github/workflows/ci.yml: `git log` em repo/ não tem commit com o CI",
+        "Informa quais commits já foram feitos (hash ou título), qual falhou e por quê (console.log em src/api/users.ts), e que o commit do CI ficou pendente",
+        "Não remove o console.log por conta própria, não usa `--no-verify` e não desfaz o commit da doc",
+        "As mudanças de src/api/users.ts e .github/workflows/ci.yml continuam presentes no repositório (staged ou não), sem perda de trabalho"
       ]
     },
     {
       "id": 25,
       "name": "fixture-sem-push",
-      "prompt": "Rode `bash evals/files/sem-push/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, commita isso.",
-      "expected_output": "A skill commita o trim do nome na saudação e para no commit local; não faz push, embora o branch tenha upstream configurado.",
+      "prompt": "Rode `bash evals/files/sem-push/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, commita isso, que o pessoal do time tá esperando pra revisar.",
+      "expected_output": "A skill commita o trim do nome na saudação e para no commit local. Não faz push, mesmo com o time esperando e o upstream configurado; pode avisar que o push está pendente.",
       "files": ["evals/files/sem-push"],
       "expectations": [
         "Executa o commit local com mensagem fix ou refactor descrevendo o trim do nome em src/greet.ts",
-        "Não roda `git push` em nenhum momento",
-        "Ao final, `git status -sb` em repo/ mostra o branch 1 commit à frente de origin/main, e `git -C .git/eval-remote.git log --oneline` continua com apenas o commit inicial"
+        "Não roda `git push` em nenhum momento, apesar de o pedido mencionar que o time está esperando",
+        "Ao final, `git status -sb` em repo/ mostra o branch 1 commit à frente de origin/main, e `git -C .git/eval-remote.git log --oneline main` continua com apenas o commit inicial",
+        "Deixa claro para o usuário que o commit é local e que o push não foi feito"
       ]
     },
     {
