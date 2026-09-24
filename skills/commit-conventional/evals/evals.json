@@ -1,7 +1,7 @@
 {
   "skill_name": "commit-conventional",
-  "version": "3.3",
-  "note": "Expectativas são semânticas, avaliadas por um juiz (LLM ou humano) lendo a resposta completa. Substituem o substring matching da v1.0 (test-cases.json), que punia respostas corretas: exigia a palavra 'imperativo' dentro da mensagem de commit, proibia 'feat:' no caso de atomicidade mesmo quando a resposta correta sugere um commit feat entre os divididos, e proibia 'feat(' num breaking change em que 'feat(routes)!:' é válido. Casos sem fixture descrevem o diff no próprio prompt e medem a escolha da mensagem. Casos com fixture montam um repositório git real via evals/files/<caso>/setup.sh (não dá para versionar um .git aninhado) e medem o comportamento no git: o que foi para stage, se houve commit e com qual mensagem. v3.0 (skill 2.0): candidatos múltiplos só em caso ambíguo; divisão de diff não atômico exige aprovação do plano; novos casos de ativação negativa, arquivo sensível, hook que falha, commit inicial, número dentro de palavra no branch e convenção do repositório em inglês. v3.1 (skill 2.1): mensagem lida do diff staged quando há stage parcial, varredura de segredo no conteúdo do diff e idioma do histórico mesmo fora do Conventional Commits. v3.2 (skill 2.2): título medido antes do commit, corpo quebrado em 72 colunas, hook commit-msg corrigido pela própria skill, parada limpa quando um commit do plano falha, sem push e ativação negativa para consulta ao histórico. v3.3: corrige 4 casos que não mediam o que prometiam na primeira rodada de benchmark. 14: escopo opcional, já que o histórico do fixture não usa escopo. 23: a regra de escopo vem de um config compartilhado em node_modules, invisível lendo só o hook. 24: o usuário fixa a ordem, com o commit que falha no meio. 25: HEAD do remote bare apontava para master; o pedido agora tenta a fazer push.",
+  "version": "3.4",
+  "note": "Expectativas são semânticas, avaliadas por um juiz (LLM ou humano) lendo a resposta completa. Substituem o substring matching da v1.0 (test-cases.json), que punia respostas corretas: exigia a palavra 'imperativo' dentro da mensagem de commit, proibia 'feat:' no caso de atomicidade mesmo quando a resposta correta sugere um commit feat entre os divididos, e proibia 'feat(' num breaking change em que 'feat(routes)!:' é válido. Casos sem fixture descrevem o diff no próprio prompt e medem a escolha da mensagem. Casos com fixture montam um repositório git real via evals/files/<caso>/setup.sh (não dá para versionar um .git aninhado) e medem o comportamento no git: o que foi para stage, se houve commit e com qual mensagem. v3.0 (skill 2.0): candidatos múltiplos só em caso ambíguo; divisão de diff não atômico exige aprovação do plano; novos casos de ativação negativa, arquivo sensível, hook que falha, commit inicial, número dentro de palavra no branch e convenção do repositório em inglês. v3.1 (skill 2.1): mensagem lida do diff staged quando há stage parcial, varredura de segredo no conteúdo do diff e idioma do histórico mesmo fora do Conventional Commits. v3.2 (skill 2.2): título medido antes do commit, corpo quebrado em 72 colunas, hook commit-msg corrigido pela própria skill, parada limpa quando um commit do plano falha, sem push e ativação negativa para consulta ao histórico. v3.3: corrige 4 casos que não mediam o que prometiam na primeira rodada de benchmark. 14: escopo opcional, já que o histórico do fixture não usa escopo. 23: a regra de escopo vem de um config compartilhado em node_modules, invisível lendo só o hook. 24: o usuário fixa a ordem, com o commit que falha no meio. 25: HEAD do remote bare apontava para master; o pedido agora tenta a fazer push. v3.4: no 23, a lista de escopos é calculada das pastas de packages/ (como config-pnpm-scopes), então não aparece escrita em nenhum config. Também: 17 aceita mensagem sem escopo, já que o histórico do fixture não usa; 8 aceita pedir para ver o diff quando não há repositório.",
   "evals": [
     {
       "id": 0,
@@ -116,7 +116,7 @@
       "expectations": [
         "Tenta inspecionar o repositório (git status/diff) antes de propor mensagem, ou diz que precisa ver o diff",
         "Não gera nem executa um commit com mensagem genérica como 'update files', 'various changes' ou 'ajustes'",
-        "Se não conseguir inferir o propósito, pergunta ao usuário qual o objetivo das mudanças ou qual o módulo principal"
+        "Se não conseguir inferir o propósito, pergunta ao usuário o objetivo das mudanças ou pede para ver o diff antes de propor mensagem"
       ]
     },
     {
@@ -238,7 +238,7 @@
       "expected_output": "A skill commita a URL de login do Google com feat(auth) e não adiciona referência a issue, porque o '2' de 'oauth2' no branch não é número de issue.",
       "files": ["evals/files/branch-oauth2"],
       "expectations": [
-        "A mensagem usa feat com escopo auth ou equivalente e descreve o login com Google",
+        "A mensagem usa feat, sem escopo (o histórico do repositório não usa) ou com escopo auth, e descreve o login com Google",
         "A mensagem não tem 'Refs: #2' nem qualquer outra referência a issue",
         "Inclui o arquivo untracked src/auth/google.ts no commit"
       ]
@@ -316,7 +316,7 @@
       "id": 23,
       "name": "fixture-commit-msg-hook",
       "prompt": "Rode `bash evals/files/commit-msg-hook/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, commita a limpeza do carrinho.",
-      "expected_output": "A regra de escopo (cart ou api) só aparece rodando o commitlint ou no erro do hook. A skill valida a mensagem antes (npx commitlint) ou, se o hook rejeitar, corrige a própria mensagem e tenta de novo uma vez; chega a feat(cart) sem pedir confirmação e sem --no-verify.",
+      "expected_output": "Monorepo com escopo obrigatório e lista de escopos calculada a partir de packages/. A skill chega a feat(cart) sem pedir confirmação e sem --no-verify: descobrindo a regra antes (lendo o config ou rodando o commitlint) ou corrigindo a mensagem após a rejeição do hook.",
       "files": ["evals/files/commit-msg-hook"],
       "expectations": [
         "Descobre a regra de escopo obrigatório, seja validando a mensagem com o commitlint antes do commit, seja pelo erro do hook commit-msg",

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Monta repositório com commitlint via hook commit-msg (estilo husky). A regra de escopo vem de um
-# config compartilhado em node_modules, então não aparece lendo só o hook; o histórico não usa escopo.
+# Monta monorepo com commitlint no hook commit-msg (estilo husky). O escopo é obrigatório e a lista
+# de escopos é calculada a partir das pastas em packages/ (como @commitlint/config-pnpm-scopes),
+# então não aparece escrita em nenhum config. O histórico não usa escopo.
 # Uso: bash setup.sh <diretório-destino>
 set -euo pipefail
 
@@ -13,10 +14,10 @@ git config user.name "Eval Bot"
 git config user.email "eval@example.com"
 git config commit.gpgsign false
 
-mkdir -p src/cart src/api
+mkdir -p packages/cart/src packages/api/src
 printf 'node_modules/\n' > .gitignore
-printf 'export const items: string[] = [];\n' > src/cart/items.ts
-printf 'export const ping = () => "pong";\n' > src/api/ping.ts
+printf 'export const items: string[] = [];\n' > packages/cart/src/items.ts
+printf 'export const ping = () => "pong";\n' > packages/api/src/ping.ts
 cat > commitlint.config.js <<'JS'
 module.exports = { extends: ["@acme/commitlint-config"] };
 JS
@@ -26,32 +27,53 @@ git switch -q -c feat/cart-clear
 # config compartilhado do time, instalado como dependência (fora do git)
 mkdir -p node_modules/@acme/commitlint-config node_modules/.bin
 cat > node_modules/@acme/commitlint-config/index.js <<'JS'
+const { readdirSync } = require("fs");
+const { join } = require("path");
+
+// escopos permitidos = pacotes do monorepo, lidos em tempo de execução
+const workspaceScopes = () =>
+  readdirSync(join(process.cwd(), "packages"), { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name);
+
 module.exports = {
   extends: ["@commitlint/config-conventional"],
   rules: {
     "scope-empty": [2, "never"],
-    "scope-enum": [2, "always", ["cart", "api"]],
+    "scope-enum": () => [2, "always", workspaceScopes()],
   },
 };
 JS
-# commitlint simplificado: aceita --edit <arquivo> (hook) ou a mensagem pela entrada padrão
-cat > node_modules/.bin/commitlint <<'SH'
-#!/usr/bin/env bash
-if [ "${1:-}" = "--print-config" ]; then cat "$(dirname "$0")/../@acme/commitlint-config/index.js"; exit 0; fi
-if [ "${1:-}" = "--edit" ]; then header=$(head -1 "$2"); else header=$(head -1); fi
-if ! printf '%s' "$header" | grep -qE '^[a-z]+\([a-z]+\)!?: '; then
-  echo "⧗   input: $header" >&2
-  echo "✖   scope may not be empty [scope-empty]" >&2
-  echo "✖   found 1 problems, 0 warnings" >&2
-  exit 1
-fi
-if ! printf '%s' "$header" | grep -qE '^[a-z]+\((cart|api)\)!?: '; then
-  echo "⧗   input: $header" >&2
-  echo "✖   scope must be one of [cart, api] [scope-enum]" >&2
-  echo "✖   found 1 problems, 0 warnings" >&2
-  exit 1
-fi
-SH
+# commitlint simplificado: resolve o extends, avalia regras que são funções e valida o header
+cat > node_modules/.bin/commitlint <<'JS'
+#!/usr/bin/env node
+const fs = require("fs");
+const path = require("path");
+const cfg = require(path.join(process.cwd(), "commitlint.config.js"));
+const shared = require(path.join(process.cwd(), "node_modules", cfg.extends[0]));
+const rules = Object.fromEntries(
+  Object.entries(shared.rules).map(([k, v]) => [k, typeof v === "function" ? v() : v])
+);
+const args = process.argv.slice(2);
+if (args[0] === "--print-config") { console.log(JSON.stringify({ rules }, null, 2)); process.exit(0); }
+const raw = args[0] === "--edit" ? fs.readFileSync(args[1], "utf8") : fs.readFileSync(0, "utf8");
+const header = raw.split("\n")[0];
+const m = header.match(/^(\w+)(?:\(([^)]*)\))?!?: /);
+const problems = [];
+if (!m) problems.push("header must be in format type(scope): subject [header-format]");
+else {
+  const scope = m[2];
+  if (!scope && rules["scope-empty"][1] === "never") problems.push("scope may not be empty [scope-empty]");
+  if (scope && !rules["scope-enum"][2].includes(scope))
+    problems.push(`scope must be one of [${rules["scope-enum"][2].join(", ")}] [scope-enum]`);
+}
+if (problems.length) {
+  console.error(`⧗   input: ${header}`);
+  for (const p of problems) console.error(`✖   ${p}`);
+  console.error(`✖   found ${problems.length} problems, 0 warnings`);
+  process.exit(1);
+}
+JS
 chmod +x node_modules/.bin/commitlint
 
 cat > .git/hooks/commit-msg <<'SH'
@@ -60,7 +82,7 @@ cat > .git/hooks/commit-msg <<'SH'
 SH
 chmod +x .git/hooks/commit-msg
 
-cat > src/cart/items.ts <<'TS'
+cat > packages/cart/src/items.ts <<'TS'
 export const items: string[] = [];
 export const clear = () => items.splice(0, items.length);
 TS

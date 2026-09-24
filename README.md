@@ -100,7 +100,7 @@ skills/commit-conventional/
       stage-parcial/          # arquivo com parte staged e parte não
       segredo-no-codigo/      # chave de API escrita direto no código
       historico-ingles-livre/ # histórico em inglês fora do Conventional Commits
-      commit-msg-hook/        # commitlint no hook commit-msg, regra de escopo num config compartilhado
+      commit-msg-hook/        # monorepo com commitlint no hook, escopos calculados de packages/
       plano-falha/            # 3 commits em ordem fixa, o do meio barrado pelo pre-commit
       sem-push/               # branch com upstream configurado
 ```
