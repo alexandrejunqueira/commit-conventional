@@ -1,7 +1,7 @@
 {
   "skill_name": "commit-conventional",
-  "version": "3.4",
-  "note": "Expectativas são semânticas, avaliadas por um juiz (LLM ou humano) lendo a resposta completa. Substituem o substring matching da v1.0 (test-cases.json), que punia respostas corretas: exigia a palavra 'imperativo' dentro da mensagem de commit, proibia 'feat:' no caso de atomicidade mesmo quando a resposta correta sugere um commit feat entre os divididos, e proibia 'feat(' num breaking change em que 'feat(routes)!:' é válido. Casos sem fixture descrevem o diff no próprio prompt e medem a escolha da mensagem. Casos com fixture montam um repositório git real via evals/files/<caso>/setup.sh (não dá para versionar um .git aninhado) e medem o comportamento no git: o que foi para stage, se houve commit e com qual mensagem. v3.0 (skill 2.0): candidatos múltiplos só em caso ambíguo; divisão de diff não atômico exige aprovação do plano; novos casos de ativação negativa, arquivo sensível, hook que falha, commit inicial, número dentro de palavra no branch e convenção do repositório em inglês. v3.1 (skill 2.1): mensagem lida do diff staged quando há stage parcial, varredura de segredo no conteúdo do diff e idioma do histórico mesmo fora do Conventional Commits. v3.2 (skill 2.2): título medido antes do commit, corpo quebrado em 72 colunas, hook commit-msg corrigido pela própria skill, parada limpa quando um commit do plano falha, sem push e ativação negativa para consulta ao histórico. v3.3: corrige 4 casos que não mediam o que prometiam na primeira rodada de benchmark. 14: escopo opcional, já que o histórico do fixture não usa escopo. 23: a regra de escopo vem de um config compartilhado em node_modules, invisível lendo só o hook. 24: o usuário fixa a ordem, com o commit que falha no meio. 25: HEAD do remote bare apontava para master; o pedido agora tenta a fazer push. v3.4: no 23, a lista de escopos é calculada das pastas de packages/ (como config-pnpm-scopes), então não aparece escrita em nenhum config. Também: 17 aceita mensagem sem escopo, já que o histórico do fixture não usa; 8 aceita pedir para ver o diff quando não há repositório.",
+  "version": "3.5",
+  "note": "Expectativas são semânticas, avaliadas por um juiz (LLM ou humano) lendo a resposta completa. Substituem o substring matching da v1.0 (test-cases.json), que punia respostas corretas: exigia a palavra 'imperativo' dentro da mensagem de commit, proibia 'feat:' no caso de atomicidade mesmo quando a resposta correta sugere um commit feat entre os divididos, e proibia 'feat(' num breaking change em que 'feat(routes)!:' é válido. Casos sem fixture descrevem o diff no próprio prompt e medem a escolha da mensagem. Casos com fixture montam um repositório git real via evals/files/<caso>/setup.sh (não dá para versionar um .git aninhado) e medem o comportamento no git: o que foi para stage, se houve commit e com qual mensagem. v3.0 (skill 2.0): candidatos múltiplos só em caso ambíguo; divisão de diff não atômico exige aprovação do plano; novos casos de ativação negativa, arquivo sensível, hook que falha, commit inicial, número dentro de palavra no branch e convenção do repositório em inglês. v3.1 (skill 2.1): mensagem lida do diff staged quando há stage parcial, varredura de segredo no conteúdo do diff e idioma do histórico mesmo fora do Conventional Commits. v3.2 (skill 2.2): título medido antes do commit, corpo quebrado em 72 colunas, hook commit-msg corrigido pela própria skill, parada limpa quando um commit do plano falha, sem push e ativação negativa para consulta ao histórico. v3.3: corrige 4 casos que não mediam o que prometiam na primeira rodada de benchmark. 14: escopo opcional, já que o histórico do fixture não usa escopo. 23: a regra de escopo vem de um config compartilhado em node_modules, invisível lendo só o hook. 24: o usuário fixa a ordem, com o commit que falha no meio. 25: HEAD do remote bare apontava para master; o pedido agora tenta a fazer push. v3.4: no 23, a lista de escopos é calculada das pastas de packages/ (como config-pnpm-scopes), então não aparece escrita em nenhum config. Também: 17 aceita mensagem sem escopo, já que o histórico do fixture não usa; 8 aceita pedir para ver o diff quando não há repositório. v3.5 (skill 2.3.1): 5, 7 e 22 verificam que o corpo não inventa causa, motivação ou detalhe técnico ausente do pedido.",
   "evals": [
     {
       "id": 0,
@@ -79,7 +79,8 @@
       "expectations": [
         "A mensagem escolhida usa o tipo chore (build ou fix também são aceitáveis se justificados; feat não é)",
         "A descrição menciona Next.js e a versão 14.1",
-        "O corpo ou a justificativa menciona o ajuste nos 3 componentes, ou a resposta avalia explicitamente se eles pertencem ao mesmo commit"
+        "O corpo ou a justificativa menciona o ajuste nos 3 componentes, ou a resposta avalia explicitamente se eles pertencem ao mesmo commit",
+        "O corpo não inventa motivação que o usuário não deu (ex.: 'para manter o build sem avisos')"
       ]
     },
     {
@@ -104,7 +105,8 @@
         "A mensagem escolhida usa o tipo perf",
         "A descrição menciona o índice em users(created_at) ou a query de listagem",
         "O ganho medido (2.3s para 80ms) aparece na descrição ou no corpo",
-        "Não classifica como fix nem feat"
+        "Não classifica como fix nem feat",
+        "O corpo não afirma causas ou detalhes técnicos que não estão no pedido (ex.: que a query 'fazia full scan' ou 'ordenava por created_at')"
       ]
     },
     {
@@ -309,7 +311,8 @@
         "A mensagem usa feat, com escopo reports ou equivalente",
         "A primeira linha tem até 72 caracteres, contando o prefixo do tipo e do escopo",
         "Detalhes que não cabem no título (formatos PDF/Excel/CSV, filtros por período e centro de custo) vão para o corpo, e não são simplesmente descartados",
-        "Nenhuma linha do corpo passa de 72 caracteres"
+        "Nenhuma linha do corpo passa de 72 caracteres",
+        "O corpo não inventa motivação ou benefício que o pedido não menciona"
       ]
     },
     {

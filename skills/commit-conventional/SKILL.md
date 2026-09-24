@@ -5,7 +5,7 @@ license: MIT
 compatibility: Git instalado; repositório Git válido com mudanças a commitar
 metadata:
   author: Alexandre Junqueira
-  version: "2.3.0"
+  version: "2.3.1"
 ---
 
 # commit-conventional
@@ -131,9 +131,9 @@ Com a aprovação, faça um commit por grupo (`git add -- <arquivos do grupo>` e
 ### Regras
 
 1. **Descrição no imperativo**: "adiciona", "corrige", "remove" ("add", "fix", "remove" em inglês). Não "adicionado", "adicionando".
-2. **Primeira linha com até 72 caracteres** (ou o `header-max-length` do commitlint), sem ponto final. Meça com `printf '%s' '<título>' | wc -c`: bytes nunca são menos que caracteres, então se couber, cabe. Títulos em PT-BR estouram o limite com facilidade; não estime de cabeça. **Corpo** quebrado em linhas de até 72 caracteres.
+2. **Primeira linha com até 72 caracteres** (ou o `header-max-length` do commitlint), sem ponto final. Meça com `printf '%s' '<título>' | wc -c`: bytes nunca são menos que caracteres, então se couber, cabe. Ao informar o tamanho ao usuário, diga bytes, não caracteres. Títulos em PT-BR estouram o limite com facilidade; não estime de cabeça. **Corpo** quebrado em linhas de até 72 caracteres.
 3. **Escopo**: o módulo dominante da mudança, preferindo escopos que já existem no histórico. Omita se a mudança não tem área dominante.
-4. **Corpo** quando o porquê não é óbvio pela descrição: workarounds, decisões, números medidos (ex.: "query cai de 2.3s para 80ms"). Não descreva linha a linha o que o diff já mostra.
+4. **Corpo** quando o porquê não é óbvio pela descrição: workarounds, decisões, números medidos (ex.: "query cai de 2.3s para 80ms"). Não descreva linha a linha o que o diff já mostra. **Só afirme o que o diff ou o usuário informam**: não deduza causas, motivações nem detalhes técnicos (ex.: "fazia full scan" quando ninguém disse isso). O histórico guarda a mensagem para sempre; se o porquê não aparece em lugar nenhum, um corpo curto ou nenhum corpo é melhor que um porquê inventado.
 5. **Breaking change**: `!` antes dos dois-pontos **e** footer `BREAKING CHANGE: <impacto para quem consome>`.
 6. **Referências a issues**, só quando houver evidência clara:
    - o usuário citou a issue no pedido;
