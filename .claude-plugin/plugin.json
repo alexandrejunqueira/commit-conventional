@@ -1,6 +1,6 @@
 {
   "name": "commit-conventional",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Commits Conventional Commits a partir do diff real: segue a convenção do repositório, faz stage seguro, recusa segredos, detecta breaking changes e divide diffs não atômicos.",
   "author": {
     "name": "Alexandre Junqueira"

@@ -15,7 +15,7 @@ A skill segue o formato aberto [Agent Skills](https://agentskills.io/specificati
 - **Referencia issues só com evidência clara** (`#123` ou `123-` no branch, ou citada pelo usuário); `oauth2` não vira `Refs: #2`.
 - **Stage seguro**: adiciona arquivos por nome, nunca `git add -A`; deixa `.env`, chaves e artefatos de build de fora e avisa; pergunta a estratégia quando há staged e unstaged misturados; com stage parcial, escreve a mensagem a partir do diff staged.
 - **Procura segredos no conteúdo**: antes de commitar, varre o diff staged atrás de chaves (`sk_live_`, `AKIA…`, `ghp_…`, chave privada) e para se encontrar alguma.
-- **Diff não atômico**: propõe um plano de divisão (arquivos e mensagem de cada commit), em ordem de dependência, e executa depois da aprovação; se um commit falha no meio, para e informa o que foi feito e o que falta.
+- **Diff não atômico**: propõe um plano de divisão (arquivos e mensagem de cada commit) e executa depois da aprovação; se um commit falha no meio, para e informa o que foi feito e o que falta.
 - **Respeita hooks**: nunca usa `--no-verify`; se o pre-commit falha, mostra o erro e propõe a correção; se o `commit-msg` (commitlint) rejeita a mensagem, corrige a própria mensagem e tenta de novo uma vez.
 - **Para no commit local**: nunca faz `git push` sem pedido explícito, nem adiciona footer de co-autoria do agente.
 - **Mostra a mensagem final completa** e commita com heredoc, para que corpo e footers saiam corretos. Candidatos alternativos só quando tipo ou escopo são ambíguos.

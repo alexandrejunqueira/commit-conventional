@@ -1,11 +1,11 @@
 ---
 name: commit-conventional
-description: Cria commits Git com mensagens Conventional Commits. Ative quando o usuário pedir para commitar mudanças, com frases como "commit", "commita isso", "faz o commit", "fazer commit das mudanças" ou "commit this". Lê o diff real, segue a convenção do próprio repositório (idioma, escopos, commitlint), faz stage só dos arquivos relevantes, recusa arquivos sensíveis, detecta diffs não atômicos e propõe como dividi-los. Não ative para explicar a spec Conventional Commits, revisar uma mensagem sem commitar, consultar o histórico ou o conteúdo de commits existentes ("o que mudou no último commit?"), fazer push, merge, revert ou rebase.
+description: Cria commits Git com mensagens Conventional Commits. Ative quando o usuário pedir para commitar mudanças, com frases como "commit", "commita isso", "faz o commit", "fazer commit das mudanças" ou "commit this". Lê o diff real, segue a convenção do próprio repositório (idioma, escopos, commitlint), faz stage só dos arquivos relevantes, recusa arquivos sensíveis, detecta diffs não atômicos e propõe como dividi-los. Não ative para explicar a spec Conventional Commits, revisar uma mensagem sem commitar, consultar commits existentes, fazer push, merge, revert ou rebase.
 license: MIT
 compatibility: Git instalado; repositório Git válido com mudanças a commitar
 metadata:
   author: Alexandre Junqueira
-  version: "2.2.0"
+  version: "2.3.0"
 ---
 
 # commit-conventional
@@ -98,9 +98,7 @@ Se não for atômico, **não commite**. Proponha um plano e peça aprovação:
 Posso commitar nessa ordem?
 ```
 
-Ordene o plano para que cada commit funcione sozinho: o que é dependência vem antes (ex.: o refactor antes da feature que usa a função extraída).
-
-Com a aprovação, faça um commit por grupo (`git add -- <arquivos do grupo>` e commit), na ordem proposta. **Se um commit falhar no meio** (hook, conflito, erro do git): pare ali, não siga para os grupos seguintes e informe quais commits já foram feitos (com o hash), qual falhou e por quê, e quais grupos ainda faltam. O que já foi commitado fica como está; não desfaça.
+Com a aprovação, faça um commit por grupo (`git add -- <arquivos do grupo>` e commit), na ordem proposta. Se um commit falhar no meio, pare ali e informe o que foi commitado, o que falhou e o que falta.
 
 **Limite**: se um mesmo arquivo contém mudanças de grupos diferentes, a divisão exige stage por trecho (`git add -p`), que é interativo. Não tente simular. Diga ao usuário qual arquivo mistura as mudanças e ofereça: commitar esse arquivo junto com um dos grupos (explicando no corpo), ou o usuário faz o `git add -p` e a skill commita o resto.
 
@@ -133,7 +131,7 @@ Com a aprovação, faça um commit por grupo (`git add -- <arquivos do grupo>` e
 ### Regras
 
 1. **Descrição no imperativo**: "adiciona", "corrige", "remove" ("add", "fix", "remove" em inglês). Não "adicionado", "adicionando".
-2. **Primeira linha com até 72 caracteres**, sem ponto final (ou o `header-max-length` do commitlint, se houver). Meça antes de commitar (seção 8). **Corpo com linhas de até 72 caracteres**, quebradas à mão; não deixe um parágrafo numa linha só.
+2. **Primeira linha com até 72 caracteres** (ou o `header-max-length` do commitlint), sem ponto final. Meça com `printf '%s' '<título>' | wc -c`: bytes nunca são menos que caracteres, então se couber, cabe. Títulos em PT-BR estouram o limite com facilidade; não estime de cabeça. **Corpo** quebrado em linhas de até 72 caracteres.
 3. **Escopo**: o módulo dominante da mudança, preferindo escopos que já existem no histórico. Omita se a mudança não tem área dominante.
 4. **Corpo** quando o porquê não é óbvio pela descrição: workarounds, decisões, números medidos (ex.: "query cai de 2.3s para 80ms"). Não descreva linha a linha o que o diff já mostra.
 5. **Breaking change**: `!` antes dos dois-pontos **e** footer `BREAKING CHANGE: <impacto para quem consome>`.
@@ -151,11 +149,6 @@ Se o tipo ou o escopo for genuinamente ambíguo (ex.: `fix` ou `refactor`; dois 
 
 ## 8. Commitar
 
-Antes de commitar, **valide a mensagem**:
-
-- **Tamanho do título**: meça com `printf '%s' '<título>' | wc -c`. `wc -c` conta bytes e cada letra acentuada vale 2, então o resultado nunca é menor que o número de caracteres: se couber em bytes, cabe no limite. Se passar, encurte o título e leve o detalhe para o corpo. Não confie na estimativa de cabeça: títulos em PT-BR estouram o limite com facilidade.
-- **commitlint instalado** (`node_modules/.bin/commitlint` existe): rode `printf '%s\n' '<mensagem>' | npx --no-install commitlint` e corrija o que ele apontar. Se o config usa `extends`, as regras reais aparecem em `npx --no-install commitlint --print-config`.
-
 Mostre a mensagem final **completa** (título, corpo e footers) e execute com heredoc, para que corpo e footers saiam em linhas corretas:
 
 ```bash
@@ -169,10 +162,9 @@ Refs: #214
 EOF
 ```
 
-- Nunca use `--no-verify`, `--amend` ou `--allow-empty` sem pedido explícito.
-- **Nunca faça `git push`**, nem ofereça como passo automático. O escopo da skill termina no commit local; push só com pedido explícito do usuário.
+- Nunca use `--no-verify`, `--amend`, `--allow-empty` ou `git push` sem pedido explícito.
 - **Hook de pre-commit falhou**: mostre o erro, explique a causa e proponha a correção. Não corrija o código do usuário nem tente de novo sem confirmação.
-- **Hook `commit-msg` rejeitou a mensagem** (commitlint via husky, por exemplo): o problema está na mensagem que a skill escreveu, não no código do usuário. Ajuste a mensagem conforme o erro (escopo exigido, tamanho, tipo permitido) e tente de novo **uma vez**, sem pedir confirmação. Se falhar de novo, ou se o erro pedir algo que só o usuário sabe (número de ticket, por exemplo), mostre o erro e pergunte.
+- **Hook `commit-msg` rejeitou a mensagem**: o erro é da mensagem, não do código. Corrija-a e tente de novo uma vez.
 - **Hook reformatou arquivos** (formatter automático): faça stage de novo **só dos mesmos arquivos** e repita o commit uma vez. **Exceção**: se algum desses arquivos tinha stage parcial (`MM`), `git add` levaria também as mudanças que o usuário deixou de fora. Nesse caso não refaça o stage: avise quais arquivos o hook alterou e deixe o usuário decidir.
 - Depois do commit, mostre `git log --oneline -1` e o `git status` resumido, deixando claro o que ficou fora do commit.
 
