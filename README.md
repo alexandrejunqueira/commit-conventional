@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="commit-conventional" width="720">
+</p>
+
 # commit-conventional
 
 Agent Skill que faz o coding agent criar commits com mensagens **Conventional Commits**, com histórico limpo e atômico. A mensagem segue o idioma e a convenção que o repositório já usa; sem convenção detectável, sai em **português (PT-BR)**.
