@@ -35,7 +35,8 @@ A skill segue o formato aberto [Agent Skills](https://agentskills.io/specificati
 - **Procura segredos no conteúdo**: antes de commitar, varre o diff staged atrás de chaves (`sk_live_`, `AKIA…`, `ghp_…`, chave privada) e para se encontrar alguma.
 - **Diff não atômico**: propõe um plano de divisão (arquivos e mensagem de cada commit) e executa depois da aprovação; se um commit falha no meio, para e informa o que foi feito e o que falta.
 - **Respeita hooks**: nunca usa `--no-verify`; se o pre-commit falha, mostra o erro e propõe a correção; se o `commit-msg` (commitlint) rejeita a mensagem, corrige a própria mensagem e tenta de novo uma vez.
-- **Para no commit local**: nunca faz `git push` sem pedido explícito, nem adiciona footer de co-autoria do agente, mesmo que o ambiente do agente peça.
+- **Para no commit local**: nunca faz `git push` sem pedido explícito.
+- **Co-autoria segue o ambiente**: se o ambiente do agente fornece uma linha `Co-authored-by`, ela entra como último footer, exatamente como veio; a skill nunca inventa nome, modelo ou e-mail, e não inclui a linha se o repositório proíbe atribuição de IA.
 - **Mostra a mensagem final completa** e commita com heredoc, para que corpo e footers saiam corretos. Candidatos alternativos só quando tipo ou escopo são ambíguos.
 
 ## Instalação
@@ -152,7 +153,7 @@ Os casos em `evals/evals.json` seguem o schema do [skill-creator](https://github
 
 - **Casos 0 a 9 e 22** descrevem o diff no próprio prompt e medem a escolha da mensagem: tipo, escopo, modo imperativo, corpo, footers. Os casos 5, 7 e 22 também verificam se o corpo inventa algo que o pedido não disse.
 - **Casos 13 e 26** medem ativação negativa: uma pergunta conceitual ou uma consulta ao histórico não deve disparar commit. O 26 roda num repositório com mudanças pendentes, para tentar o agente.
-- **Casos 10 a 12, 14 a 21 e 23 a 26** usam fixtures em `evals/files/` e medem o comportamento no git. Como um `.git` aninhado não pode ser versionado, cada fixture é um `setup.sh` que monta um repositório descartável:
+- **Casos 10 a 12, 14 a 21 e 23 a 28** usam fixtures em `evals/files/` e medem o comportamento no git. Como um `.git` aninhado não pode ser versionado, cada fixture é um `setup.sh` que monta um repositório descartável:
 
 ```bash
 bash skills/commit-conventional/evals/files/atomicidade/setup.sh /tmp/repo-atomicidade
@@ -179,6 +180,7 @@ Cuidados que aprendemos rodando:
 
 As versões são tags git (`vX.Y.Z`); o número também está em `metadata.version` no `SKILL.md` e em `.claude-plugin/plugin.json`.
 
+- **2.4.0**: inclui a linha de co-autoria que o ambiente do agente fornecer (antes era removida), salvo quando o repositório proíbe atribuição de IA.
 - **2.3.1**: o corpo só afirma o que está no diff ou no pedido; o tamanho do título é informado em bytes.
 - **2.3.0**: enxuga regras que não mudaram o resultado nos benchmarks (push, hook `commit-msg`, falha no meio do plano, consulta ao histórico).
 - **2.2.0**: título medido antes do commit, corpo em 72 colunas, hook `commit-msg`, parada limpa quando um commit do plano falha, sem push.

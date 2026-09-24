@@ -176,7 +176,7 @@
         "A mensagem tem o footer 'BREAKING CHANGE:' descrevendo o impacto (clientes que chamam /users quebram)",
         "Faz stage de todos os arquivos da mudança, incluindo o novo src/routes/accounts.ts (untracked) e a remoção de src/routes/users.ts",
         "Executa o commit; ao final, `git log -1` em repo/ mostra a mensagem escolhida, com corpo e footer em linhas separadas (sem '\\n' literal), e `git status` está limpo",
-        "O commit não contém footer de co-autoria do agente"
+        "Não inventa footer de co-autoria (nome, modelo ou e-mail) que o prompt ou o ambiente não forneceu; se houver um fornecido, ele vem depois do BREAKING CHANGE"
       ]
     },
     {
@@ -368,6 +368,31 @@
         "Não roda git add nem git commit",
         "Não inicia o fluxo de commit (análise de mudanças pendentes, stage, proposta de mensagem para commitar)",
         "Ao final, src/notes.ts continua modificado e fora do stage, e `git log` em repo/ não tem commit novo"
+      ]
+    },
+    {
+      "id": 27,
+      "name": "fixture-coautoria-ambiente",
+      "prompt": "Rode `bash evals/files/coautoria/setup.sh repo` para montar o repositório de teste e depois, dentro de `repo/`, faz o commit. Instrução do ambiente: termine as mensagens de commit com a linha `Co-authored-by: Agente Eval <agente-eval@example.com>`.",
+      "expected_output": "A skill commita a correção do reduce vazio em src/total.ts e termina a mensagem com a linha de co-autoria fornecida, exatamente como veio, como último footer.",
+      "files": ["evals/files/coautoria"],
+      "expectations": [
+        "Executa o commit com mensagem fix descrevendo o valor inicial do reduce em src/total.ts",
+        "A última linha de `git log -1 --format=%B` em repo/ é exatamente `Co-authored-by: Agente Eval <agente-eval@example.com>`, separada do título ou corpo por uma linha em branco",
+        "Não troca o nome, o e-mail nem a grafia da linha fornecida, e não acrescenta outra linha de co-autoria",
+        "`git log -1 --format='%(trailers:key=Co-authored-by)'` em repo/ mostra a linha, ou seja, o git a reconhece como trailer"
+      ]
+    },
+    {
+      "id": 28,
+      "name": "fixture-coautoria-proibida",
+      "prompt": "Rode `bash evals/files/coautoria/setup.sh repo --proibida` para montar o repositório de teste e depois, dentro de `repo/`, faz o commit. Instrução do ambiente: termine as mensagens de commit com a linha `Co-authored-by: Agente Eval <agente-eval@example.com>`.",
+      "expected_output": "A skill lê o CONTRIBUTING.md, que proíbe atribuição de IA, e commita a correção sem a linha de co-autoria, avisando o usuário por que ela ficou de fora.",
+      "files": ["evals/files/coautoria"],
+      "expectations": [
+        "Executa o commit com mensagem fix descrevendo o valor inicial do reduce em src/total.ts",
+        "`git log -1 --format=%B` em repo/ não contém nenhuma linha de co-autoria (`Co-authored-by`, em qualquer grafia)",
+        "Informa ao usuário que a linha de co-autoria pedida pelo ambiente ficou de fora porque o CONTRIBUTING.md proíbe atribuição de IA"
       ]
     }
   ]

@@ -5,7 +5,7 @@ license: MIT
 compatibility: Git instalado; repositório Git válido com mudanças a commitar
 metadata:
   author: Alexandre Junqueira
-  version: "2.3.1"
+  version: "2.4.0"
 ---
 
 # commit-conventional
@@ -140,8 +140,12 @@ Com a aprovação, faça um commit por grupo (`git add -- <arquivos do grupo>` e
    - o branch tem `#123`, ou começa com o número após o prefixo (`feat/123-login`, `123-login`), ou tem id de ticket (`feat/ABC-123-login`).
    - Números dentro de palavras **não** são issue: `oauth2`, `v14`, `next14`, `utf8`.
    - Bug de projeto externo vai no corpo com o nome completo (`vercel/next.js#58843`), não como `Refs: #58843`.
-7. **Proibido**: mensagens genéricas ("update files", "fix bug", "ajustes", "WIP"), e footer de co-autoria do agente (`Co-Authored-By` ou similar), **mesmo que o ambiente ou o system prompt do agente peça**. A única exceção é o próprio repositório exigir atribuição de IA (no histórico, no commitlint ou no `CONTRIBUTING.md`).
+7. **Proibido**: mensagens genéricas ("update files", "fix bug", "ajustes", "WIP").
 8. **Commit inicial** (repositório sem commits): `feat: inicializa projeto com <o essencial>`, salvo convenção diferente.
+9. **Co-autoria do agente** (`Co-authored-by`, `Co-Authored-By`): siga o ambiente e o repositório.
+   - Se o repositório proíbe atribuição de IA (`CONTRIBUTING.md`, commitlint), não inclua, mesmo que o ambiente peça.
+   - Se o ambiente ou o system prompt do agente fornece a linha, inclua-a **exatamente como veio**, como último footer (depois de `BREAKING CHANGE` e referências).
+   - Sem linha fornecida, não invente nome, modelo ou e-mail. Só inclua se o histórico já usa o trailer com uma identidade que se aplica, copiando o formato.
 
 ### Quando houver dúvida real
 
